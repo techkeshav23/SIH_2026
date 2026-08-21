@@ -52,6 +52,11 @@ class Settings(BaseSettings):
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
 
+    # ---- Observability ----
+    sentry_dsn: str = ""             # empty -> Sentry disabled
+    log_level: str = "INFO"
+    log_json: bool = False           # True -> structured JSON logs (prod)
+
     @property
     def is_dev(self) -> bool:
         return self.app_env == "dev"

@@ -13,6 +13,14 @@ def test_security_headers_present(client):
     assert h.get("x-frame-options") == "DENY"
 
 
+def test_request_id_header(client):
+    # server generates one
+    assert client.get("/health").headers.get("x-request-id")
+    # ...and echoes a client-supplied one
+    r = client.get("/health", headers={"X-Request-ID": "trace-abc-123"})
+    assert r.headers.get("x-request-id") == "trace-abc-123"
+
+
 def test_rate_limit_triggers(client, monkeypatch):
     """With limiting enabled, hammering request-otp returns 429."""
     monkeypatch.setattr(settings, "rate_limit_enabled", True)

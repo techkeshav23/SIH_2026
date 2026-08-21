@@ -10,12 +10,18 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.api import ai, auth, buyer_auth, buyers, orders, pricing, products
 from app.core.config import settings
 from app.core.db import init_db
+from app.core.observability import RequestIdMiddleware, init_sentry, setup_logging
+
+setup_logging()
+init_sentry()
 
 app = FastAPI(
     title="KalaSetu API",
     description="AI Market Linkage & Smart Cataloging for Artisans (SIH 26090)",
     version="0.1.0",
 )
+
+app.add_middleware(RequestIdMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
