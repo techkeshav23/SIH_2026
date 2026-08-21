@@ -14,6 +14,7 @@ final apiProvider = Provider<Api>((ref) => Api());
 class Api {
   final Dio _dio;
   String? _token;
+  String? _refreshToken;
 
   Api() : _dio = Dio(BaseOptions(baseUrl: kBaseUrl)) {
     _dio.interceptors.add(InterceptorsWrapper(
@@ -23,18 +24,50 @@ class Api {
         }
         handler.next(options);
       },
+      onError: (e, handler) async {
+        // On a 401, try a one-shot refresh then replay the original request.
+        final isAuthRoute = e.requestOptions.path.startsWith('/auth/');
+        if (e.response?.statusCode == 401 &&
+            _refreshToken != null &&
+            !isAuthRoute &&
+            e.requestOptions.extra['retried'] != true) {
+          if (await _refreshAccess()) {
+            final opts = e.requestOptions..extra['retried'] = true;
+            opts.headers['Authorization'] = 'Bearer $_token';
+            try {
+              return handler.resolve(await _dio.fetch(opts));
+            } catch (_) {/* fall through */}
+          }
+        }
+        handler.next(e);
+      },
     ));
   }
 
   Future<void> loadToken() async {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString('token');
+    _refreshToken = prefs.getString('refresh_token');
   }
 
-  Future<void> _saveToken(String token) async {
-    _token = token;
+  Future<void> _saveTokens(String access, String refresh) async {
+    _token = access;
+    _refreshToken = refresh;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('token', token);
+    await prefs.setString('token', access);
+    await prefs.setString('refresh_token', refresh);
+  }
+
+  Future<bool> _refreshAccess() async {
+    try {
+      final r = await _dio.post('/auth/refresh', data: {'refresh_token': _refreshToken});
+      _token = r.data['access_token'];
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('token', _token!);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   bool get isLoggedIn => _token != null;
@@ -53,7 +86,7 @@ class Api {
 
   Future<UserModel> verifyOtp(String phone, String otp) async {
     final r = await _dio.post('/auth/verify-otp', data: {'phone': phone, 'otp': otp});
-    await _saveToken(r.data['access_token']);
+    await _saveTokens(r.data['access_token'], r.data['refresh_token']);
     return UserModel.fromJson(r.data['user']);
   }
 

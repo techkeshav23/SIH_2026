@@ -5,18 +5,31 @@ from jose import JWTError, jwt
 from app.core.config import settings
 
 ALGORITHM = "HS256"
-TOKEN_TTL_HOURS = 24 * 30  # long-lived for hackathon convenience
 
 
-def create_access_token(user_id: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(hours=TOKEN_TTL_HOURS)
-    payload = {"sub": user_id, "exp": expire}
+def _encode(sub: str, token_type: str, ttl: timedelta) -> str:
+    payload = {
+        "sub": sub,
+        "type": token_type,
+        "exp": datetime.now(timezone.utc) + ttl,
+    }
     return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
 
 
-def decode_token(token: str) -> str | None:
+def create_access_token(user_id: str) -> str:
+    return _encode(user_id, "access", timedelta(minutes=settings.access_token_ttl_min))
+
+
+def create_refresh_token(user_id: str) -> str:
+    return _encode(user_id, "refresh", timedelta(days=settings.refresh_token_ttl_days))
+
+
+def decode_token(token: str, expected_type: str = "access") -> str | None:
+    """Return the subject (user id) if the token is valid and of the right type."""
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
-        return payload.get("sub")
     except JWTError:
         return None
+    if payload.get("type") != expected_type:
+        return None
+    return payload.get("sub")

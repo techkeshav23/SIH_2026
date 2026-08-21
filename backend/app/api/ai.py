@@ -5,9 +5,13 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.db import SessionLocal, get_db
+from app.core.limiter import rate_limit
+from app.core.uploads import validate_audio, validate_image
 from app.models import Product, User, VoiceNote
 from app.models.schemas import CatalogFromText, JobAccepted, ProductOut
 from app.services import image_ai, language_ai
+
+_ai_limit = rate_limit("ai", max_calls=30, window_sec=60)
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -40,9 +44,11 @@ async def enhance_image(
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(_ai_limit),
 ):
     p = _owned(db, user, product_id)
     raw = await file.read()
+    validate_image(file, raw)
     p.status = "processing"
     db.commit()
     background.add_task(_enhance_task, product_id, raw)
@@ -85,9 +91,11 @@ async def catalog_from_voice(
     source_lang: str = Form("hi"),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(_ai_limit),
 ):
     p = _owned(db, user, product_id)
     audio = await file.read()
+    validate_audio(file, audio)
     mime = _audio_mime(file)
     p.status = "processing"
     db.commit()

@@ -37,8 +37,18 @@ class UserUpdate(BaseModel):
 
 class AuthToken(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
     user: UserOut
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class AccessToken(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
 
 
 # ---- Products ----

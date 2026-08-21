@@ -6,6 +6,9 @@ venv/
 env/
 *.egg-info/
 .pytest_cache/
+pytest-cache-files-*/
+backend/tests/_test.db
+*.db
 .env
 .env.*
 !.env.example
