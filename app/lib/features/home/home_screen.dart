@@ -30,6 +30,11 @@ class HomeScreen extends ConsumerWidget {
         title: Text(T.of(context, lang, 'my_products')),
         actions: [
           IconButton(
+            tooltip: 'Dashboard',
+            icon: const Icon(Icons.dashboard_outlined),
+            onPressed: () => context.push('/dashboard'),
+          ),
+          IconButton(
             tooltip: 'Orders',
             icon: const Icon(Icons.receipt_long_outlined),
             onPressed: () => context.push('/orders'),
@@ -44,6 +49,14 @@ class HomeScreen extends ConsumerWidget {
             icon: const Icon(Icons.translate),
             onPressed: () => ref.read(langProvider.notifier).state =
                 lang == AppLang.hi ? AppLang.en : AppLang.hi,
+          ),
+          IconButton(
+            tooltip: 'Logout',
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              await ref.read(apiProvider).logout();
+              if (context.mounted) context.go('/login');
+            },
           ),
         ],
       ),

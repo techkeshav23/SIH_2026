@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api import ai, auth, buyer_auth, buyers, orders, pricing, products
+from app.api import ai, auth, buyer_auth, buyers, dashboard, orders, pricing, products
 from app.core.config import settings
 from app.core.db import init_db
 from app.core.observability import RequestIdMiddleware, init_sentry, setup_logging
@@ -89,6 +89,7 @@ app.include_router(pricing.router)
 app.include_router(buyers.router)
 app.include_router(buyer_auth.router)
 app.include_router(orders.router)
+app.include_router(dashboard.router)
 
 _uploads = os.path.join(os.path.dirname(__file__), "..", "uploads")
 os.makedirs(_uploads, exist_ok=True)

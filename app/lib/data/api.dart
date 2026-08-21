@@ -15,6 +15,7 @@ class Api {
   final Dio _dio;
   String? _token;
   String? _refreshToken;
+  String? _role; // 'artisan' | 'buyer'
 
   Api() : _dio = Dio(BaseOptions(baseUrl: kBaseUrl)) {
     _dio.interceptors.add(InterceptorsWrapper(
@@ -48,19 +49,31 @@ class Api {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString('token');
     _refreshToken = prefs.getString('refresh_token');
+    _role = prefs.getString('role');
   }
 
-  Future<void> _saveTokens(String access, String refresh) async {
+  Future<void> _saveTokens(String access, String refresh, String role) async {
     _token = access;
     _refreshToken = refresh;
+    _role = role;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('token', access);
     await prefs.setString('refresh_token', refresh);
+    await prefs.setString('role', role);
+  }
+
+  Future<void> logout() async {
+    _token = _refreshToken = _role = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('token');
+    await prefs.remove('refresh_token');
+    await prefs.remove('role');
   }
 
   Future<bool> _refreshAccess() async {
     try {
-      final r = await _dio.post('/auth/refresh', data: {'refresh_token': _refreshToken});
+      final path = _role == 'buyer' ? '/buyer/auth/refresh' : '/auth/refresh';
+      final r = await _dio.post(path, data: {'refresh_token': _refreshToken});
       _token = r.data['access_token'];
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('token', _token!);
@@ -71,6 +84,8 @@ class Api {
   }
 
   bool get isLoggedIn => _token != null;
+  String? get role => _role;
+  bool get isBuyer => _role == 'buyer';
 
   bool _isOffline(Object e) =>
       e is DioException &&
@@ -86,8 +101,19 @@ class Api {
 
   Future<UserModel> verifyOtp(String phone, String otp) async {
     final r = await _dio.post('/auth/verify-otp', data: {'phone': phone, 'otp': otp});
-    await _saveTokens(r.data['access_token'], r.data['refresh_token']);
+    await _saveTokens(r.data['access_token'], r.data['refresh_token'], 'artisan');
     return UserModel.fromJson(r.data['user']);
+  }
+
+  // ---- buyer auth ----
+  Future<String?> buyerRequestOtp(String phone) async {
+    final r = await _dio.post('/buyer/auth/request-otp', data: {'phone': phone});
+    return r.data['dev_otp'];
+  }
+
+  Future<void> buyerVerifyOtp(String phone, String otp) async {
+    final r = await _dio.post('/buyer/auth/verify-otp', data: {'phone': phone, 'otp': otp});
+    await _saveTokens(r.data['access_token'], r.data['refresh_token'], 'buyer');
   }
 
   // ---- products ----
@@ -167,6 +193,12 @@ class Api {
         data: {'product_id': productId, 'org_name': orgName, 'message': message});
   }
 
+  // ---- dashboard (artisan) ----
+  Future<ArtisanStats> artisanStats() async {
+    final r = await _dio.get('/dashboard/artisan');
+    return ArtisanStats.fromJson(r.data);
+  }
+
   // ---- orders (artisan side) ----
   Future<List<Order>> incomingOrders() async {
     final r = await _dio.get('/orders/incoming');
@@ -180,6 +212,27 @@ class Api {
 
   Future<Order> rejectOrder(String id) async {
     final r = await _dio.post('/orders/$id/reject');
+    return Order.fromJson(r.data);
+  }
+
+  // ---- orders (buyer side) ----
+  Future<Order> placeOrder(String productId, int quantity, {String? note}) async {
+    final r = await _dio.post('/orders',
+        data: {'product_id': productId, 'quantity': quantity, 'note': note});
+    return Order.fromJson(r.data);
+  }
+
+  Future<List<Order>> myOrders() async {
+    final r = await _dio.get('/orders');
+    return (r.data as List).map((e) => Order.fromJson(e)).toList();
+  }
+
+  /// Pay (mock gateway) then confirm — returns the paid order.
+  Future<Order> payAndConfirm(String orderId) async {
+    final checkout = await _dio.post('/orders/$orderId/pay');
+    final paymentId = checkout.data['provider_order_id'];
+    final r = await _dio.post('/orders/$orderId/confirm-payment',
+        data: {'provider_payment_id': paymentId});
     return Order.fromJson(r.data);
   }
 

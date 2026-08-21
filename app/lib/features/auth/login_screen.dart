@@ -6,6 +6,8 @@ import '../../core/l10n.dart';
 import '../../core/theme.dart';
 import '../../data/api.dart';
 
+enum Role { artisan, buyer }
+
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
   @override
@@ -15,14 +17,19 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _phone = TextEditingController();
   final _otp = TextEditingController();
+  Role _role = Role.artisan;
   bool _otpSent = false;
   bool _loading = false;
   String? _error;
 
+  Api get _api => ref.read(apiProvider);
+
   Future<void> _sendOtp() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final devOtp = await ref.read(apiProvider).requestOtp(_phone.text.trim());
+      final devOtp = _role == Role.artisan
+          ? await _api.requestOtp(_phone.text.trim())
+          : await _api.buyerRequestOtp(_phone.text.trim());
       setState(() { _otpSent = true; if (devOtp != null) _otp.text = devOtp; });
     } catch (e) {
       setState(() => _error = 'Failed to send OTP — is the backend running?');
@@ -34,8 +41,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _verify() async {
     setState(() { _loading = true; _error = null; });
     try {
-      await ref.read(apiProvider).verifyOtp(_phone.text.trim(), _otp.text.trim());
-      if (mounted) context.go('/home');
+      if (_role == Role.artisan) {
+        await _api.verifyOtp(_phone.text.trim(), _otp.text.trim());
+        if (mounted) context.go('/home');
+      } else {
+        await _api.buyerVerifyOtp(_phone.text.trim(), _otp.text.trim());
+        if (mounted) context.go('/buyer/home');
+      }
     } catch (e) {
       setState(() => _error = 'Invalid OTP');
     } finally {
@@ -63,7 +75,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               Text(T.of(context, lang, 'tagline'),
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 16, color: AppColors.muted)),
-              const SizedBox(height: 40),
+              const SizedBox(height: 28),
+              // role selector
+              SegmentedButton<Role>(
+                segments: const [
+                  ButtonSegment(value: Role.artisan, label: Text('Artisan'), icon: Icon(Icons.brush)),
+                  ButtonSegment(value: Role.buyer, label: Text('Buyer'), icon: Icon(Icons.shopping_bag)),
+                ],
+                selected: {_role},
+                onSelectionChanged: _otpSent ? null : (s) => setState(() => _role = s.first),
+              ),
+              const SizedBox(height: 20),
               TextField(
                 controller: _phone,
                 keyboardType: TextInputType.phone,
@@ -97,7 +119,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     : Text(T.of(context, lang, _otpSent ? 'verify' : 'send_otp')),
               ),
               const Spacer(),
-              // language toggle
               TextButton(
                 onPressed: () => ref.read(langProvider.notifier).state =
                     lang == AppLang.hi ? AppLang.en : AppLang.hi,

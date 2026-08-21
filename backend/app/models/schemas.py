@@ -215,3 +215,13 @@ class PaymentCheckout(BaseModel):
 class PaymentConfirm(BaseModel):
     provider_payment_id: str | None = None
     signature: str | None = None
+
+
+# ---- Dashboard ----
+class ArtisanStats(BaseModel):
+    products: int
+    listed: int
+    orders_total: int
+    orders_pending: int
+    orders_paid: int
+    earnings: float

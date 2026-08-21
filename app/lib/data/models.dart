@@ -149,4 +149,32 @@ class Order {
       );
 
   bool get isPending => status == 'pending';
+  bool get isAccepted => status == 'accepted';
+}
+
+class ArtisanStats {
+  final int products;
+  final int listed;
+  final int ordersTotal;
+  final int ordersPending;
+  final int ordersPaid;
+  final double earnings;
+
+  ArtisanStats({
+    required this.products,
+    required this.listed,
+    required this.ordersTotal,
+    required this.ordersPending,
+    required this.ordersPaid,
+    required this.earnings,
+  });
+
+  factory ArtisanStats.fromJson(Map<String, dynamic> j) => ArtisanStats(
+        products: j['products'] ?? 0,
+        listed: j['listed'] ?? 0,
+        ordersTotal: j['orders_total'] ?? 0,
+        ordersPending: j['orders_pending'] ?? 0,
+        ordersPaid: j['orders_paid'] ?? 0,
+        earnings: (j['earnings'] as num?)?.toDouble() ?? 0,
+      );
 }
