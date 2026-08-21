@@ -10,12 +10,14 @@ class Settings(BaseSettings):
 
     use_real_ai: bool = False
 
-    cloudinary_url: str = ""
-    bhashini_user_id: str = ""
-    bhashini_api_key: str = ""
-    bhashini_pipeline_id: str = ""
-    openai_api_key: str = ""
+    # Gemini powers voice cataloging + pricing reasoning
     gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
+
+    # Image (F1): Pillow by default (no deps); rembg for real bg-removal
+    use_rembg: bool = False
+    cloudinary_url: str = ""  # optional hosted alternative
+
     pricing_model_path: str = "../ml/pricing_model.pkl"
 
     @property

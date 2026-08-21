@@ -26,10 +26,36 @@ def _save(img: Image.Image, name: str) -> str:
 
 
 def enhance(raw_bytes: bytes, product_id: str) -> str:
-    """Return URL of the enhanced image."""
+    """Return URL of the enhanced image.
+
+    Priority: rembg (true bg-removal) -> Cloudinary (hosted) -> Pillow (default,
+    no deps/keys). rembg gives clean e-commerce cutouts; Pillow just does
+    lighting/crop so the demo always works.
+    """
+    if settings.use_rembg:
+        try:
+            return _enhance_rembg(raw_bytes, product_id)
+        except Exception:
+            pass  # fall through to Pillow if rembg unavailable
     if settings.use_real_ai and settings.cloudinary_url:
         return _enhance_cloudinary(raw_bytes, product_id)
     return _enhance_local(raw_bytes, product_id)
+
+
+def _enhance_rembg(raw_bytes: bytes, product_id: str) -> str:
+    """True background removal (U2-Net) -> composite on white -> 1080 square."""
+    from rembg import remove
+
+    cut = Image.open(io.BytesIO(remove(raw_bytes))).convert("RGBA")
+
+    side = max(cut.size)
+    canvas = Image.new("RGBA", (side, side), (255, 255, 255, 255))
+    canvas.paste(cut, ((side - cut.width) // 2, (side - cut.height) // 2), cut)
+    out = canvas.convert("RGB")
+    out = ImageOps.autocontrast(out, cutoff=1)
+    out = ImageEnhance.Sharpness(out).enhance(1.15)
+    out = out.resize((1080, 1080), Image.LANCZOS)
+    return _save(out, f"{product_id}_enhanced.jpg")
 
 
 def _enhance_local(raw_bytes: bytes, product_id: str) -> str:

@@ -94,7 +94,7 @@ class CatalogFromText(BaseModel):
 
 
 class CatalogResult(BaseModel):
-    """Structured listing the LLM must return."""
+    """Structured listing the LLM must return (also used as Gemini response schema)."""
     title_en: str
     title_hi: str
     description_en: str
@@ -102,6 +102,7 @@ class CatalogResult(BaseModel):
     category: str
     material: str
     tags: list[str] = []
+    transcript: str | None = None  # original-language transcript (voice path)
 
 
 # ---- Pricing ----

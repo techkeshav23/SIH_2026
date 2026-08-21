@@ -10,8 +10,11 @@ pillow==11.1.0
 scikit-learn==1.6.0
 numpy==2.2.1
 joblib==1.4.2
-# optional / real integrations (uncomment when wiring keys):
+
+# ---- AI ----
+# Gemini powers voice cataloging (F2) + pricing reasoning (F3).
+google-genai==1.9.0
+
+# Image background removal (F1) — optional, heavier (onnxruntime + model download).
+# Enable with USE_REMBG=true after installing. Default path uses Pillow (no key/deps).
 # rembg==2.0.61
-# cloudinary==1.42.0
-# openai==1.59.0            # Whisper STT fallback + LLM
-# google-generativeai==0.8.3

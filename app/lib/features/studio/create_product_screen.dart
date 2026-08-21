@@ -57,7 +57,11 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
     } else {
       if (await _recorder.hasPermission()) {
         final dir = await getTempDir();
-        await _recorder.start(const RecordConfig(), path: '$dir/note.m4a');
+        // WAV is reliably accepted by Gemini's multimodal audio input.
+        await _recorder.start(
+          const RecordConfig(encoder: AudioEncoder.wav),
+          path: '$dir/note.wav',
+        );
         setState(() => _recording = true);
       }
     }

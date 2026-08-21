@@ -62,7 +62,16 @@ See [docs/openapi.yaml](docs/openapi.yaml) — the frozen contract both mobile &
 
 **Mobile:** Flutter · Riverpod · GoRouter · Hive (offline) · easy_localization
 **Backend:** FastAPI · SQLAlchemy · Pydantic v2 · Postgres (Supabase)
-**AI:** Bhashini (STT/translate) · Cloudinary/rembg (image) · Gemini/Claude (copy) · scikit-learn (pricing)
+**AI:** **Gemini** (voice→listing, multimodal · pricing reasoning) · rembg/Pillow (image) · scikit-learn (pricing)
+
+### Enabling real AI (Gemini)
+1. Get a free key: https://aistudio.google.com/apikey
+2. In `backend/.env` set `GEMINI_API_KEY=...` and `USE_REAL_AI=true`
+3. Verify: `cd backend && .venv\Scripts\python.exe test_gemini.py`
+
+Without a key everything still runs on functional **stubs** (great for offline dev).
+The language layer is provider-agnostic — Bhashini can be plugged in later for
+govt deployment without touching the app.
 
 ## Team
 

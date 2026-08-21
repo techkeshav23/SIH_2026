@@ -1,3 +1,5 @@
+import mimetypes
+
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
@@ -48,16 +50,16 @@ async def enhance_image(
 
 
 # ---------- F2: voice -> listing (async) ----------
-def _catalog_task(product_id: str, audio_bytes: bytes, source_lang: str):
+def _catalog_task(product_id: str, audio_bytes: bytes, mime_type: str, source_lang: str):
     db = SessionLocal()
     try:
         p = db.get(Product, product_id)
         if not p:
             return
-        raw, translated = language_ai.transcribe(audio_bytes, source_lang)
-        db.add(VoiceNote(product_id=product_id, transcript_raw=raw,
-                         transcript_lang=source_lang, translated_en=translated))
-        listing = language_ai.generate_listing(translated, p.category or "", p.material or "")
+        # single Gemini multimodal call: audio -> transcript + EN/HI listing
+        listing = language_ai.catalog_from_audio(audio_bytes, mime_type, source_lang)
+        db.add(VoiceNote(product_id=product_id, transcript_raw=listing.transcript,
+                         transcript_lang=source_lang, translated_en=listing.description_en))
         p.title_en, p.title_hi = listing.title_en, listing.title_hi
         p.desc_en, p.desc_hi = listing.description_en, listing.description_hi
         p.category, p.material, p.tags = listing.category, listing.material, listing.tags
@@ -65,6 +67,14 @@ def _catalog_task(product_id: str, audio_bytes: bytes, source_lang: str):
         db.commit()
     finally:
         db.close()
+
+
+def _audio_mime(file: UploadFile) -> str:
+    mime = file.content_type
+    if not mime or mime == "application/octet-stream":
+        guessed, _ = mimetypes.guess_type(file.filename or "")
+        mime = guessed or "audio/wav"
+    return mime
 
 
 @router.post("/catalog-from-voice", response_model=JobAccepted, status_code=status.HTTP_202_ACCEPTED)
@@ -78,9 +88,10 @@ async def catalog_from_voice(
 ):
     p = _owned(db, user, product_id)
     audio = await file.read()
+    mime = _audio_mime(file)
     p.status = "processing"
     db.commit()
-    background.add_task(_catalog_task, product_id, audio, source_lang)
+    background.add_task(_catalog_task, product_id, audio, mime, source_lang)
     return JobAccepted(product_id=product_id, status="processing")
 
 
