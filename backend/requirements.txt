@@ -11,6 +11,12 @@ scikit-learn==1.6.0
 numpy==2.2.1
 joblib==1.4.2
 
+# ---- infra: migrations, async jobs, prod DB driver ----
+alembic==1.14.0
+celery==5.4.0
+redis==5.2.1
+psycopg[binary]==3.2.3            # Postgres driver (prod)
+
 # ---- AI ----
 # Gemini powers voice cataloging (F2) + pricing reasoning (F3).
 google-genai==1.9.0

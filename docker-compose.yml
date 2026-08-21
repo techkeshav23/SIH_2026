@@ -1,0 +1,61 @@
+# Local production-like stack: API + Celery worker + Postgres + Redis.
+#   docker compose up --build
+# API → http://localhost:8000/docs
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: kalasetu
+      POSTGRES_PASSWORD: kalasetu
+      POSTGRES_DB: kalasetu
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kalasetu"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build: ./backend
+    environment:
+      APP_ENV: prod
+      DATABASE_URL: postgresql+psycopg://kalasetu:kalasetu@db:5432/kalasetu
+      REDIS_URL: redis://redis:6379/0
+      USE_CELERY: "true"
+      SECRET_KEY: change-me-in-prod
+      CORS_ORIGINS: "*"
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    ports:
+      - "8000:8000"
+    volumes:
+      - uploads:/app/uploads
+
+  worker:
+    build: ./backend
+    command: celery -A app.core.celery_app.celery_app worker --loglevel=info
+    environment:
+      APP_ENV: prod
+      DATABASE_URL: postgresql+psycopg://kalasetu:kalasetu@db:5432/kalasetu
+      REDIS_URL: redis://redis:6379/0
+      USE_CELERY: "true"
+      SECRET_KEY: change-me-in-prod
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    volumes:
+      - uploads:/app/uploads
+
+volumes:
+  pgdata:
+  uploads:

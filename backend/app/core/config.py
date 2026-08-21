@@ -8,6 +8,10 @@ class Settings(BaseSettings):
     secret_key: str = "dev-secret-change-me"
     database_url: str = "sqlite:///./kalasetu.db"
 
+    # ---- Async jobs ----
+    redis_url: str = ""              # e.g. redis://localhost:6379/0
+    use_celery: bool = False         # when False (or no redis_url), tasks run inline (eager)
+
     # ---- Auth / tokens ----
     access_token_ttl_min: int = 60           # short-lived access token
     refresh_token_ttl_days: int = 30         # long-lived refresh token

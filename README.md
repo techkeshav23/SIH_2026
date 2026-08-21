@@ -53,6 +53,19 @@ flutter pub get
 flutter run
 ```
 
+### Tests
+```bash
+cd backend && .venv\Scripts\python.exe -m pytest -q     # 27 tests
+```
+
+### Production-like stack (Docker)
+```bash
+docker compose up --build        # API + Celery worker + Postgres + Redis
+# API → http://localhost:8000/docs
+```
+Migrations run automatically (`alembic upgrade head`) on API start. To create a
+new migration after changing models: `cd backend && alembic revision --autogenerate -m "msg"`.
+
 ### API contract
 See [docs/openapi.yaml](docs/openapi.yaml) — the frozen contract both mobile & backend build against.
 
