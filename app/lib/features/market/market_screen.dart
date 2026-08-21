@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
+import '../../core/widgets.dart';
 import '../../data/api.dart';
 import '../../data/models.dart';
 
@@ -17,36 +18,67 @@ class MarketScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final feed = ref.watch(feedProvider);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('B2B Marketplace'),
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(24),
-          child: Padding(
-            padding: EdgeInsets.only(bottom: 8),
-            child: Text('Powered by ONDC · GeM ready',
-                style: TextStyle(fontSize: 12, color: AppColors.muted)),
-          ),
-        ),
-      ),
-      body: feed.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => const Center(child: Text('Could not load marketplace')),
-        data: (items) => items.isEmpty
-            ? const Center(child: Text('No listed products yet.'))
-            : RefreshIndicator(
-                onRefresh: () async => ref.invalidate(feedProvider),
-                child: GridView.builder(
-                  padding: const EdgeInsets.all(12),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.72,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                  ),
-                  itemCount: items.length,
-                  itemBuilder: (_, i) => _FeedCard(p: items[i], api: ref.read(apiProvider)),
-                ),
+      body: Column(
+        children: [
+          KHeader(
+            title: 'B2B Marketplace',
+            subtitle: 'Powered by ONDC · GeM ready',
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(Radii.pill),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
               ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.verified_rounded, size: 15, color: Colors.white),
+                  SizedBox(width: 6),
+                  Text('Govt · ONDC',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2)),
+                ],
+              ),
+            ),
+          ),
+          Expanded(
+            child: feed.when(
+              loading: () => const KLoading(),
+              error: (e, _) => KErrorState(
+                message: 'Could not load marketplace',
+                onRetry: () => ref.invalidate(feedProvider),
+              ),
+              data: (items) => items.isEmpty
+                  ? const KEmpty(
+                      icon: Icons.storefront_outlined,
+                      title: 'No listed products yet',
+                      subtitle:
+                          'Listed crafts from artisans will appear here for bulk inquiry.',
+                    )
+                  : RefreshIndicator(
+                      color: AppColors.primary,
+                      onRefresh: () async => ref.invalidate(feedProvider),
+                      child: GridView.builder(
+                        padding: const EdgeInsets.all(16),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: 0.66,
+                          crossAxisSpacing: 14,
+                          mainAxisSpacing: 14,
+                        ),
+                        itemCount: items.length,
+                        itemBuilder: (_, i) =>
+                            _FeedCard(p: items[i], api: ref.read(apiProvider)),
+                      ),
+                    ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -60,40 +92,74 @@ class _FeedCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final img = p.enhancedImageUrl ?? p.rawImageUrl;
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => _openInquiry(context),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: img != null
-                  ? Image.network(api.mediaUrl(img), width: double.infinity, fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => const _Ph())
-                  : const _Ph(),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(p.titleEn ?? p.titleHi ?? 'Product',
-                      maxLines: 2, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                  const SizedBox(height: 4),
-                  Text(
-                    p.finalPrice != null
-                        ? '₹${p.finalPrice!.toStringAsFixed(0)}'
-                        : (p.suggestedPriceMin != null
-                            ? '₹${p.suggestedPriceMin!.toStringAsFixed(0)}+'
-                            : ''),
-                    style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold),
-                  ),
-                ],
+    final price = p.finalPrice != null
+        ? '₹${p.finalPrice!.toStringAsFixed(0)}'
+        : (p.suggestedPriceMin != null
+            ? '₹${p.suggestedPriceMin!.toStringAsFixed(0)}+'
+            : 'Ask price');
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(Radii.lg),
+        border: Border.all(color: AppColors.line),
+        boxShadow: Decor.soft,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openInquiry(context),
+          borderRadius: BorderRadius.circular(Radii.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: KNetImage(
+                  img != null ? api.mediaUrl(img) : null,
+                  width: double.infinity,
+                  radius: Radii.lg,
+                ),
               ),
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      p.titleEn ?? p.titleHi ?? 'Product',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      price,
+                      style: const TextStyle(
+                        color: AppColors.success,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Icon(Icons.chat_bubble_outline_rounded,
+                            size: 14, color: AppColors.primary),
+                        const SizedBox(width: 6),
+                        Text('Tap to inquire',
+                            style: TextStyle(
+                              color: AppColors.primary.withValues(alpha: 0.9),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            )),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -108,15 +174,6 @@ class _FeedCard extends StatelessWidget {
   }
 }
 
-class _Ph extends StatelessWidget {
-  const _Ph();
-  @override
-  Widget build(BuildContext context) => Container(
-        color: AppColors.bg,
-        child: const Center(child: Icon(Icons.image_outlined, color: AppColors.muted)),
-      );
-}
-
 class _InquirySheet extends StatefulWidget {
   const _InquirySheet({required this.p, required this.api});
   final Product p;
@@ -127,14 +184,16 @@ class _InquirySheet extends StatefulWidget {
 
 class _InquirySheetState extends State<_InquirySheet> {
   final _org = TextEditingController();
-  final _msg = TextEditingController(text: 'Interested in bulk order. Please share MOQ & rate.');
+  final _msg = TextEditingController(
+      text: 'Interested in bulk order. Please share MOQ & rate.');
   bool _sending = false;
 
   Future<void> _send() async {
     if (_org.text.trim().isEmpty) return;
     setState(() => _sending = true);
     try {
-      await widget.api.sendInquiry(widget.p.id, _org.text.trim(), _msg.text.trim());
+      await widget.api
+          .sendInquiry(widget.p.id, _org.text.trim(), _msg.text.trim());
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -148,33 +207,86 @@ class _InquirySheetState extends State<_InquirySheet> {
 
   @override
   Widget build(BuildContext context) {
+    final title = widget.p.titleEn ?? widget.p.titleHi ?? 'this product';
     return Padding(
       padding: EdgeInsets.only(
-        left: 20, right: 20, top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        left: 20,
+        right: 20,
+        top: 12,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Inquire — ${widget.p.titleEn ?? widget.p.titleHi ?? ''}',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 16),
+          Center(
+            child: Container(
+              width: 44,
+              height: 5,
+              decoration: BoxDecoration(
+                color: AppColors.line,
+                borderRadius: BorderRadius.circular(Radii.pill),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(Radii.md),
+                ),
+                child: const Icon(Icons.mark_email_read_outlined,
+                    color: AppColors.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Send inquiry',
+                        style: Theme.of(context).textTheme.titleLarge),
+                    const SizedBox(height: 2),
+                    Text(title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
           TextField(
             controller: _org,
+            textCapitalization: TextCapitalization.words,
             decoration: const InputDecoration(
-                labelText: 'Your organization / GSTIN', border: OutlineInputBorder()),
+              labelText: 'Your organization / GSTIN',
+              prefixIcon: Icon(Icons.business_outlined),
+            ),
           ),
-          const SizedBox(height: 12),
+          Gap.m,
           TextField(
             controller: _msg,
             maxLines: 3,
-            decoration: const InputDecoration(labelText: 'Message', border: OutlineInputBorder()),
+            decoration: const InputDecoration(
+              labelText: 'Message',
+              alignLabelWithHint: true,
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           FilledButton.icon(
             onPressed: _sending ? null : _send,
-            icon: const Icon(Icons.send),
+            icon: _sending
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.send_rounded),
             label: Text(_sending ? 'Sending…' : 'Send inquiry'),
           ),
         ],

@@ -9,6 +9,7 @@ import 'package:record/record.dart';
 
 import '../../core/l10n.dart';
 import '../../core/theme.dart';
+import '../../core/widgets.dart';
 import '../../data/api.dart';
 import '../../data/local_store.dart';
 import '../../data/models.dart';
@@ -143,24 +144,28 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
   @override
   Widget build(BuildContext context) {
     final lang = ref.watch(langProvider);
+    final text = Theme.of(context).textTheme;
     final p = _product;
     return Scaffold(
       appBar: AppBar(title: Text(T.of(context, lang, 'add_product'))),
       body: Stack(
         children: [
           ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
             children: [
               _StepCard(
-                icon: Icons.camera_alt,
+                step: 1,
+                icon: Icons.camera_alt_rounded,
                 title: T.of(context, lang, 'take_photo'),
+                isLast: false,
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (p?.enhancedImageUrl != null)
                       _BeforeAfter(api: _api, product: p!)
                     else if (p?.rawImageUrl != null)
-                      Image.network(_api.mediaUrl(p!.rawImageUrl!), height: 180),
-                    const SizedBox(height: 8),
+                      KNetImage(_api.mediaUrl(p!.rawImageUrl!), height: 180, radius: Radii.md),
+                    if (p?.enhancedImageUrl != null || p?.rawImageUrl != null) Gap.m,
                     FilledButton.icon(
                       onPressed: _busy ? null : _takePhoto,
                       icon: const Icon(Icons.auto_fix_high),
@@ -170,48 +175,85 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
                 ),
               ),
               _StepCard(
-                icon: Icons.mic,
+                step: 2,
+                icon: Icons.mic_rounded,
                 title: T.of(context, lang, 'record_voice'),
+                isLast: false,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     FilledButton.icon(
                       onPressed: _busy ? null : _toggleRecord,
                       style: FilledButton.styleFrom(
-                          backgroundColor: _recording ? Colors.red : AppColors.primary),
-                      icon: Icon(_recording ? Icons.stop : Icons.mic),
+                          backgroundColor: _recording ? AppColors.danger : AppColors.primary),
+                      icon: Icon(_recording ? Icons.stop_rounded : Icons.mic_rounded),
                       label: Text(_recording ? 'Stop' : T.of(context, lang, 'record_voice')),
                     ),
-                    const SizedBox(height: 8),
-                    const Text('— या टाइप करें / or type —',
-                        textAlign: TextAlign.center, style: TextStyle(color: AppColors.muted)),
-                    const SizedBox(height: 8),
+                    Gap.m,
+                    Row(
+                      children: [
+                        const Expanded(child: Divider()),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text('या टाइप करें / or type',
+                              style: text.labelSmall),
+                        ),
+                        const Expanded(child: Divider()),
+                      ],
+                    ),
+                    Gap.m,
                     TextField(
                       controller: _textCtrl,
                       maxLines: 2,
                       decoration: const InputDecoration(
                         hintText: 'हाथ से बुनी सूती साड़ी…',
-                        border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    OutlinedButton(onPressed: _busy ? null : _catalogFromText, child: const Text('Generate listing')),
+                    Gap.s,
+                    OutlinedButton.icon(
+                      onPressed: _busy ? null : _catalogFromText,
+                      icon: const Icon(Icons.edit_note_rounded),
+                      label: const Text('Generate listing'),
+                    ),
                     if (p?.titleEn != null) ...[
-                      const Divider(height: 24),
-                      Text(p!.titleHi ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      const SizedBox(height: 4),
-                      Text(p.titleEn ?? '', style: const TextStyle(color: AppColors.muted)),
-                      const SizedBox(height: 8),
-                      Text(p.descHi ?? '', style: const TextStyle(fontSize: 14)),
-                      const SizedBox(height: 6),
-                      Wrap(spacing: 6, children: [for (final t in p.tags) Chip(label: Text('#$t'))]),
+                      Gap.m,
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceAlt,
+                          borderRadius: BorderRadius.circular(Radii.md),
+                          border: Border.all(color: AppColors.line),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(p!.titleHi ?? '', style: text.titleMedium),
+                            if ((p.titleEn ?? '').isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(p.titleEn ?? '', style: text.bodyMedium),
+                            ],
+                            if ((p.descHi ?? '').isNotEmpty) ...[
+                              Gap.s,
+                              Text(p.descHi ?? '', style: text.bodyMedium),
+                            ],
+                            if (p.tags.isNotEmpty) ...[
+                              Gap.s,
+                              Wrap(spacing: 6, runSpacing: 6, children: [
+                                for (final t in p.tags) Chip(label: Text('#$t')),
+                              ]),
+                            ],
+                          ],
+                        ),
+                      ),
                     ],
                   ],
                 ),
               ),
               _StepCard(
-                icon: Icons.currency_rupee,
+                step: 3,
+                icon: Icons.currency_rupee_rounded,
                 title: T.of(context, lang, 'suggest_price'),
+                isLast: true,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -221,40 +263,73 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
                       label: Text(T.of(context, lang, 'suggest_price')),
                     ),
                     if (_price != null) ...[
-                      const SizedBox(height: 12),
-                      Text('₹${_price!.min.toStringAsFixed(0)} – ₹${_price!.max.toStringAsFixed(0)}',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppColors.success)),
-                      const SizedBox(height: 8),
-                      Text(_price!.reasoning, style: const TextStyle(color: AppColors.muted, fontSize: 13)),
+                      Gap.m,
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 22),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(Radii.lg),
+                          border: Border.all(color: AppColors.success.withValues(alpha: 0.25)),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.local_offer_rounded,
+                                    size: 15, color: AppColors.success),
+                                const SizedBox(width: 6),
+                                Text('Suggested price',
+                                    style: text.labelSmall
+                                        ?.copyWith(color: AppColors.success)),
+                              ],
+                            ),
+                            Gap.s,
+                            Text(
+                              '₹${_price!.min.toStringAsFixed(0)} – ₹${_price!.max.toStringAsFixed(0)}',
+                              textAlign: TextAlign.center,
+                              style: text.displaySmall?.copyWith(color: AppColors.success),
+                            ),
+                            Gap.s,
+                            Text(_price!.reasoning,
+                                textAlign: TextAlign.center, style: text.bodyMedium),
+                          ],
+                        ),
+                      ),
                     ],
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
+              Gap.m,
               FilledButton.icon(
                 onPressed: (p != null && _price != null && !_busy) ? _publish : null,
                 icon: const Icon(Icons.storefront),
                 label: Text(T.of(context, lang, 'publish')),
               ),
-              const SizedBox(height: 40),
             ],
           ),
           if (_busy)
             Container(
-              color: Colors.black26,
+              color: Colors.black.withValues(alpha: 0.28),
               child: Center(
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const CircularProgressIndicator(),
-                        const SizedBox(height: 16),
-                        Text(_status),
-                      ],
-                    ),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 40),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 26),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(Radii.lg),
+                    boxShadow: Decor.lift,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const KLoading(),
+                      Gap.m,
+                      Text(_status,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.titleMedium),
+                    ],
                   ),
                 ),
               ),
@@ -265,54 +340,123 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
   }
 }
 
+/// A single step in the vertical stepper: numbered gradient badge + connector
+/// line on the left, titled KCard on the right.
 class _StepCard extends StatelessWidget {
-  const _StepCard({required this.icon, required this.title, required this.child});
+  const _StepCard({
+    required this.step,
+    required this.icon,
+    required this.title,
+    required this.child,
+    required this.isLast,
+  });
+  final int step;
   final IconData icon;
   final String title;
   final Widget child;
+  final bool isLast;
+
   @override
-  Widget build(BuildContext context) => Card(
-        margin: const EdgeInsets.only(bottom: 16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Column(
             children: [
-              Row(children: [
-                CircleAvatar(backgroundColor: AppColors.bg, child: Icon(icon, color: AppColors.primary)),
-                const SizedBox(width: 12),
-                Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-              ]),
-              const SizedBox(height: 12),
-              child,
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  gradient: Decor.warmGradient,
+                  shape: BoxShape.circle,
+                  boxShadow: Decor.soft,
+                ),
+                child: Text('$step',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800)),
+              ),
+              if (!isLast)
+                Expanded(
+                  child: Container(
+                    width: 2,
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    color: AppColors.line,
+                  ),
+                ),
             ],
           ),
-        ),
-      );
+          Gap.m,
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 20),
+              child: KCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(icon, size: 20, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(title, style: text.titleLarge)),
+                      ],
+                    ),
+                    Gap.m,
+                    child,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-/// Simple before/after: shows enhanced image with a label. A draggable slider
-/// can be added later (before_after_slider pkg) — kept minimal for scaffold.
+/// Shows the AI-enhanced image with a rounded frame and a success "AI enhanced"
+/// pill overlaid in the corner. A draggable slider can be added later.
 class _BeforeAfter extends StatelessWidget {
   const _BeforeAfter({required this.api, required this.product});
   final Api api;
   final Product product;
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Stack(
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.network(api.mediaUrl(product.enhancedImageUrl!), height: 200, fit: BoxFit.cover),
+        KNetImage(
+          api.mediaUrl(product.enhancedImageUrl!),
+          height: 200,
+          width: double.infinity,
+          radius: Radii.md,
         ),
-        const SizedBox(height: 6),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(Icons.auto_awesome, size: 16, color: AppColors.success),
-            SizedBox(width: 4),
-            Text('AI enhanced', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.w600)),
-          ],
+        Positioned(
+          top: 10,
+          left: 10,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: AppColors.success,
+              borderRadius: BorderRadius.circular(Radii.pill),
+              boxShadow: Decor.soft,
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.auto_awesome, size: 14, color: Colors.white),
+                SizedBox(width: 5),
+                Text('AI enhanced',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ),
         ),
       ],
     );

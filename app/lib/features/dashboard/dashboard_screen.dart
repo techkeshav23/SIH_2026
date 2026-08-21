@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
+import '../../core/widgets.dart';
 import '../../data/api.dart';
 import '../../data/models.dart';
 
@@ -16,30 +17,43 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final stats = ref.watch(statsProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Dashboard')),
       body: stats.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => const Center(child: Text('Could not load stats')),
+        loading: () => const KLoading(),
+        error: (e, _) => KErrorState(
+          message: 'Could not load stats',
+          onRetry: () => ref.invalidate(statsProvider),
+        ),
         data: (s) => RefreshIndicator(
           onRefresh: () async => ref.invalidate(statsProvider),
           child: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.zero,
             children: [
-              _EarningsCard(earnings: s.earnings, paid: s.ordersPaid),
-              const SizedBox(height: 16),
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 1.5,
-                children: [
-                  _StatCard(label: 'Products', value: '${s.products}', icon: Icons.inventory_2, color: AppColors.primary),
-                  _StatCard(label: 'Listed', value: '${s.listed}', icon: Icons.storefront, color: AppColors.accent),
-                  _StatCard(label: 'Total orders', value: '${s.ordersTotal}', icon: Icons.receipt_long, color: Colors.blue),
-                  _StatCard(label: 'Pending', value: '${s.ordersPending}', icon: Icons.hourglass_top, color: Colors.orange),
-                ],
+              KHeader(
+                title: 'Dashboard',
+                trailing: _EarningsHero(earnings: s.earnings, paid: s.ordersPaid),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    _EarningsBanner(earnings: s.earnings, paid: s.ordersPaid),
+                    Gap.m,
+                    GridView.count(
+                      crossAxisCount: 2,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: 1.35,
+                      children: [
+                        _StatCard(label: 'Products', value: '${s.products}', icon: Icons.inventory_2_rounded, color: AppColors.primary),
+                        _StatCard(label: 'Listed', value: '${s.listed}', icon: Icons.storefront_rounded, color: AppColors.accent),
+                        _StatCard(label: 'Total orders', value: '${s.ordersTotal}', icon: Icons.receipt_long_rounded, color: AppColors.indigo),
+                        _StatCard(label: 'Pending', value: '${s.ordersPending}', icon: Icons.hourglass_top_rounded, color: AppColors.success),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -49,28 +63,77 @@ class DashboardScreen extends ConsumerWidget {
   }
 }
 
-class _EarningsCard extends StatelessWidget {
-  const _EarningsCard({required this.earnings, required this.paid});
+/// Compact earnings summary shown inside the gradient hero header.
+class _EarningsHero extends StatelessWidget {
+  const _EarningsHero({required this.earnings, required this.paid});
   final double earnings;
   final int paid;
   @override
-  Widget build(BuildContext context) => Card(
-        color: AppColors.primary,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Total earnings', style: TextStyle(color: Colors.white70, fontSize: 14)),
-              const SizedBox(height: 6),
-              Text('₹${earnings.toStringAsFixed(0)}',
-                  style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text('from $paid paid order(s)', style: const TextStyle(color: Colors.white70, fontSize: 13)),
-            ],
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '₹${earnings.toStringAsFixed(0)}',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 30,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.6,
           ),
         ),
-      );
+        const SizedBox(height: 2),
+        Text(
+          'from $paid paid order${paid == 1 ? '' : 's'}',
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13),
+        ),
+      ],
+    );
+  }
+}
+
+/// Subtle repeat of total earnings as a labelled banner below the hero.
+class _EarningsBanner extends StatelessWidget {
+  const _EarningsBanner({required this.earnings, required this.paid});
+  final double earnings;
+  final int paid;
+  @override
+  Widget build(BuildContext context) {
+    return KCard(
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.payments_rounded, color: AppColors.primary),
+          ),
+          Gap.m,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Total earnings', style: Theme.of(context).textTheme.labelSmall),
+                const SizedBox(height: 2),
+                Text(
+                  '₹${earnings.toStringAsFixed(0)}',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+              ],
+            ),
+          ),
+          Text(
+            'from $paid paid order${paid == 1 ? '' : 's'}',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _StatCard extends StatelessWidget {
@@ -80,18 +143,26 @@ class _StatCard extends StatelessWidget {
   final IconData icon;
   final Color color;
   @override
-  Widget build(BuildContext context) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Icon(icon, color: color),
-              Text(value, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
-              Text(label, style: const TextStyle(color: AppColors.muted, fontSize: 13)),
-            ],
-          ),
+  Widget build(BuildContext context) => KCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.14),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            Text(
+              value,
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            Text(label, style: Theme.of(context).textTheme.labelSmall),
+          ],
         ),
       );
 }

@@ -59,74 +59,103 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final lang = ref.watch(langProvider);
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Spacer(),
-              const Icon(Icons.storefront_rounded, size: 88, color: AppColors.primary),
-              const SizedBox(height: 16),
-              Text(T.of(context, lang, 'app_name'),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 34, fontWeight: FontWeight.bold, color: AppColors.primary)),
-              const SizedBox(height: 6),
-              Text(T.of(context, lang, 'tagline'),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 16, color: AppColors.muted)),
-              const SizedBox(height: 28),
-              // role selector
-              SegmentedButton<Role>(
-                segments: const [
-                  ButtonSegment(value: Role.artisan, label: Text('Artisan'), icon: Icon(Icons.brush)),
-                  ButtonSegment(value: Role.buyer, label: Text('Buyer'), icon: Icon(Icons.shopping_bag)),
-                ],
-                selected: {_role},
-                onSelectionChanged: _otpSent ? null : (s) => setState(() => _role = s.first),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: _phone,
-                keyboardType: TextInputType.phone,
-                decoration: InputDecoration(
-                  labelText: T.of(context, lang, 'phone'),
-                  prefixIcon: const Icon(Icons.phone),
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              if (_otpSent) ...[
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _otp,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'OTP',
-                    prefixIcon: Icon(Icons.lock_outline),
-                    border: OutlineInputBorder(),
+      body: Column(
+        children: [
+          // hero
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 56, 24, 48),
+            decoration: const BoxDecoration(
+              gradient: Decor.heroGradient,
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(Radii.xl)),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 78, height: 78,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(Radii.lg),
                   ),
+                  child: const Icon(Icons.storefront_rounded, size: 42, color: Colors.white),
                 ),
+                const SizedBox(height: 16),
+                Text(T.of(context, lang, 'app_name'),
+                    style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: -0.5)),
+                const SizedBox(height: 4),
+                Text(T.of(context, lang, 'tagline'),
+                    style: TextStyle(fontSize: 15, color: Colors.white.withValues(alpha: 0.92))),
               ],
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Text(_error!, style: const TextStyle(color: Colors.red)),
-              ],
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: _loading ? null : (_otpSent ? _verify : _sendOtp),
-                child: _loading
-                    ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : Text(T.of(context, lang, _otpSent ? 'verify' : 'send_otp')),
-              ),
-              const Spacer(),
-              TextButton(
-                onPressed: () => ref.read(langProvider.notifier).state =
-                    lang == AppLang.hi ? AppLang.en : AppLang.hi,
-                child: Text(lang == AppLang.hi ? 'English' : 'हिंदी'),
-              ),
-            ],
+            ),
           ),
-        ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SegmentedButton<Role>(
+                    style: SegmentedButton.styleFrom(
+                      selectedBackgroundColor: AppColors.primary,
+                      selectedForegroundColor: Colors.white,
+                      side: const BorderSide(color: AppColors.line),
+                    ),
+                    segments: const [
+                      ButtonSegment(value: Role.artisan, label: Text('Artisan'), icon: Icon(Icons.brush)),
+                      ButtonSegment(value: Role.buyer, label: Text('Buyer'), icon: Icon(Icons.shopping_bag)),
+                    ],
+                    selected: {_role},
+                    onSelectionChanged: _otpSent ? null : (s) => setState(() => _role = s.first),
+                  ),
+                  const SizedBox(height: 24),
+                  TextField(
+                    controller: _phone,
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      labelText: T.of(context, lang, 'phone'),
+                      prefixIcon: const Icon(Icons.phone_outlined),
+                    ),
+                  ),
+                  if (_otpSent) ...[
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: _otp,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'OTP',
+                        prefixIcon: Icon(Icons.lock_outline),
+                      ),
+                    ),
+                  ],
+                  if (_error != null) ...[
+                    const SizedBox(height: 14),
+                    Row(children: [
+                      const Icon(Icons.error_outline, color: AppColors.danger, size: 18),
+                      const SizedBox(width: 6),
+                      Expanded(child: Text(_error!, style: const TextStyle(color: AppColors.danger))),
+                    ]),
+                  ],
+                  const SizedBox(height: 24),
+                  FilledButton(
+                    onPressed: _loading ? null : (_otpSent ? _verify : _sendOtp),
+                    child: _loading
+                        ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : Text(T.of(context, lang, _otpSent ? 'verify' : 'send_otp')),
+                  ),
+                  const SizedBox(height: 8),
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: () => ref.read(langProvider.notifier).state =
+                          lang == AppLang.hi ? AppLang.en : AppLang.hi,
+                      icon: const Icon(Icons.translate, size: 18),
+                      label: Text(lang == AppLang.hi ? 'English' : 'हिंदी में'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

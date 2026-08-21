@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/l10n.dart';
 import '../../core/theme.dart';
+import '../../core/widgets.dart';
 import '../../data/api.dart';
 import '../../data/models.dart';
 
@@ -74,28 +75,25 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       appBar: AppBar(
         title: Text(T.of(context, lang, 'my_products')),
         actions: [
-          if (p != null) _StatusChip(status: p.status),
+          if (p != null) KStatusPill(p.status),
           const SizedBox(width: 12),
         ],
       ),
       body: _loading || p == null
-          ? const Center(child: CircularProgressIndicator())
+          ? const KLoading()
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 if (p.enhancedImageUrl != null || p.rawImageUrl != null)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Image.network(
-                      _api.mediaUrl(p.enhancedImageUrl ?? p.rawImageUrl!),
-                      height: 240, width: double.infinity, fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Container(
-                        height: 240, color: AppColors.bg,
-                        child: const Icon(Icons.image_outlined, size: 48, color: AppColors.muted),
-                      ),
-                    ),
+                  KNetImage(
+                    _api.mediaUrl(p.enhancedImageUrl ?? p.rawImageUrl!),
+                    height: 240,
+                    width: double.infinity,
+                    radius: Radii.lg,
                   ),
-                const SizedBox(height: 16),
+                Gap.m,
+                const KSectionTitle('Listing'),
+                Gap.s,
                 _field('शीर्षक (हिंदी)', _titleHi),
                 _field('Title (English)', _titleEn),
                 _field('विवरण (हिंदी)', _descHi, maxLines: 4),
@@ -104,15 +102,34 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Wrap(spacing: 6, children: [for (final t in p.tags) Chip(label: Text('#$t'))]),
                   ),
-                const Divider(height: 28),
-                if (p.suggestedPriceMin != null)
-                  Text(
-                    'AI suggested: ₹${p.suggestedPriceMin!.toStringAsFixed(0)} – ₹${p.suggestedPriceMax!.toStringAsFixed(0)}',
-                    style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.w600),
+                Gap.m,
+                const KSectionTitle('Pricing'),
+                Gap.s,
+                if (p.suggestedPriceMin != null) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(Radii.md),
+                      border: Border.all(color: AppColors.success.withValues(alpha: 0.30)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.auto_awesome, size: 18, color: AppColors.success),
+                        Gap.s,
+                        Expanded(
+                          child: Text(
+                            'AI suggested: ₹${p.suggestedPriceMin!.toStringAsFixed(0)} – ₹${p.suggestedPriceMax!.toStringAsFixed(0)}',
+                            style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                const SizedBox(height: 8),
+                  Gap.m,
+                ],
                 _field('Final price (₹)', _price, keyboard: TextInputType.number),
-                const SizedBox(height: 20),
+                Gap.l,
                 Row(
                   children: [
                     Expanded(
@@ -131,7 +148,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 40),
+                Gap.xl,
               ],
             ),
     );
@@ -145,25 +162,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
           controller: c,
           maxLines: maxLines,
           keyboardType: keyboard,
-          decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+          decoration: InputDecoration(labelText: label),
         ),
       );
-}
-
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.status});
-  final String status;
-  @override
-  Widget build(BuildContext context) {
-    final colors = {
-      'draft': Colors.grey,
-      'processing': AppColors.accent,
-      'ready': AppColors.success,
-      'listed': AppColors.primary,
-    };
-    return Chip(
-      label: Text(status, style: TextStyle(color: colors[status] ?? Colors.grey, fontSize: 12)),
-      backgroundColor: (colors[status] ?? Colors.grey).withValues(alpha: 0.12),
-    );
-  }
 }
