@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KalaSetu — कला को बाज़ार से जोड़ें · AI market linkage for artisans</title>
+<meta name="description" content="KalaSetu turns an artisan's photo and voice into a professional, priced, ready-to-sell listing — and connects them to year-round digital markets. SIH 2026 · MoSJE · PS 26090." />
+<link rel="icon" href="assets/logo.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..900;1,9..144,400..700&family=Hanken+Grotesk:wght@400;500;600;700&family=Tiro+Devanagari+Hindi:ital@0;1&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --cream:#FBF6EE; --paper:#F4ECDF; --sand:#EBDFC9; --line:#E4D7BF;
+    --ink:#241C14; --ink-soft:#5C4E3D; --muted:#94826A;
+    --terra:#BE4A2F; --terra-dk:#8F3620; --haldi:#E8A317; --haldi-dk:#C6820A;
+    --indigo:#20264A; --indigo-2:#161B38; --indigo-soft:#3A4472;
+    --green:#2E7D5B;
+    --serif:"Fraunces",Georgia,serif; --sans:"Hanken Grotesk",system-ui,sans-serif; --deva:"Tiro Devanagari Hindi",serif;
+    --maxw:1180px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--cream); color:var(--ink); font-family:var(--sans);
+    font-size:17px; line-height:1.6; -webkit-font-smoothing:antialiased; overflow-x:hidden;
+  }
+  /* grain overlay */
+  body::before{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:9999; opacity:.035;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
+  .deva{font-family:var(--deva)}
+  .serif{font-family:var(--serif)}
+  .eyebrow{
+    font-size:12.5px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--terra);
+    display:inline-flex;align-items:center;gap:10px;
+  }
+  .eyebrow::before{content:"";width:26px;height:2px;background:var(--terra);display:inline-block}
+
+  /* ---------- NAV ---------- */
+  nav{
+    position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);
+    background:rgba(251,246,238,.82);border-bottom:1px solid var(--line);
+  }
+  .nav-in{display:flex;align-items:center;justify-content:space-between;height:72px}
+  .brand{display:flex;align-items:center;gap:12px;font-family:var(--serif);font-weight:800;font-size:22px;letter-spacing:-.01em}
+  .brand img{width:40px;height:40px;border-radius:11px;box-shadow:0 6px 18px rgba(143,54,32,.22)}
+  .brand small{font-family:var(--deva);font-weight:400;color:var(--muted);font-size:15px;margin-left:2px}
+  .nav-links{display:flex;gap:32px;align-items:center;font-size:14.5px;font-weight:600;color:var(--ink-soft)}
+  .nav-links a{position:relative;transition:color .2s}
+  .nav-links a::after{content:"";position:absolute;left:0;bottom:-6px;width:0;height:2px;background:var(--terra);transition:width .25s}
+  .nav-links a:hover{color:var(--ink)} .nav-links a:hover::after{width:100%}
+  .btn{
+    display:inline-flex;align-items:center;gap:9px;font-weight:700;font-size:14.5px;
+    padding:12px 22px;border-radius:100px;transition:transform .2s,box-shadow .2s,background .2s;cursor:pointer;border:none;
+  }
+  .btn-primary{background:var(--terra);color:#fff;box-shadow:0 10px 24px -8px rgba(190,74,47,.6)}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 16px 32px -8px rgba(190,74,47,.7)}
+  .btn-ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+  .btn-ghost:hover{border-color:var(--terra);color:var(--terra)}
+
+  /* ---------- HERO ---------- */
+  .hero{position:relative;padding:88px 0 96px;overflow:hidden}
+  .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:40px;align-items:center}
+  .hero h1{
+    font-family:var(--serif);font-weight:600;font-size:clamp(42px,5.6vw,74px);line-height:1.02;letter-spacing:-.02em;
+    margin:22px 0 8px;
+  }
+  .hero h1 .hi{font-family:var(--deva);font-weight:400;color:var(--terra);font-size:.92em}
+  .hero h1 em{font-style:italic;color:var(--indigo)}
+  .lead{font-size:19px;color:var(--ink-soft);max-width:33ch;margin:18px 0 30px}
+  .hero-cta{display:flex;gap:14px;flex-wrap:wrap}
+  .trust{display:flex;gap:22px;align-items:center;margin-top:34px;flex-wrap:wrap;color:var(--muted);font-size:13px;font-weight:600}
+  .trust b{color:var(--ink-soft)}
+  .trust .dot{width:5px;height:5px;border-radius:50%;background:var(--haldi)}
+  /* decorative knot watermark */
+  .knot-wm{position:absolute;right:-140px;top:-80px;width:520px;opacity:.06;transform:rotate(-8deg);pointer-events:none}
+  .thread{position:absolute;left:0;top:220px;width:100%;height:1px;
+    background:repeating-linear-gradient(90deg,var(--line) 0 14px,transparent 14px 26px);opacity:.7}
+
+  /* phone mockup */
+  .phone-stage{position:relative;display:flex;justify-content:center}
+  .phone{
+    position:relative;width:290px;height:600px;border-radius:42px;background:#141018;
+    padding:12px;box-shadow:0 40px 80px -30px rgba(36,28,20,.6), 0 0 0 2px rgba(255,255,255,.04) inset;
+    transform:rotate(3.2deg);animation:float 6s ease-in-out infinite;
+  }
+  @keyframes float{0%,100%{transform:rotate(3.2deg) translateY(0)}50%{transform:rotate(3.2deg) translateY(-14px)}}
+  .screen{width:100%;height:100%;border-radius:32px;background:var(--cream);overflow:hidden;position:relative}
+  .ph-header{background:linear-gradient(135deg,var(--terra),#D9772E);padding:44px 18px 20px;color:#fff;border-radius:0 0 26px 26px}
+  .ph-header .k{display:flex;align-items:center;gap:9px}
+  .ph-header .k img{width:30px;height:30px;border-radius:8px}
+  .ph-header .k b{font-family:var(--serif);font-size:19px}
+  .ph-header p{font-size:12px;opacity:.9;margin-top:6px}
+  .ph-body{padding:16px}
+  .ph-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:11px;display:flex;gap:11px;align-items:center;margin-bottom:11px;box-shadow:0 8px 18px -12px rgba(143,54,32,.25)}
+  .ph-thumb{width:52px;height:52px;border-radius:12px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+  .ph-card h5{font-family:var(--deva);font-size:13px;font-weight:400;color:var(--ink)}
+  .ph-card .price{color:var(--green);font-weight:800;font-size:13px;margin-top:3px}
+  .ph-pill{display:inline-block;font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:100px;margin-top:5px}
+  .ph-fab{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);background:var(--terra);color:#fff;
+    padding:12px 20px;border-radius:100px;font-size:12.5px;font-weight:700;display:flex;gap:7px;align-items:center;box-shadow:0 12px 24px -8px rgba(190,74,47,.6);white-space:nowrap}
+
+  /* ---------- MARQUEE ---------- */
+  .marquee{background:var(--indigo);color:var(--cream);padding:16px 0;overflow:hidden;border-top:3px solid var(--haldi)}
+  .mq-track{display:flex;gap:44px;white-space:nowrap;width:max-content;animation:scroll 26s linear infinite;font-family:var(--serif);font-size:20px;font-style:italic}
+  .mq-track span{display:flex;align-items:center;gap:44px;color:var(--cream)}
+  .mq-track b{color:var(--haldi);font-style:normal;font-family:var(--sans);font-weight:800}
+  @keyframes scroll{to{transform:translateX(-50%)}}
+
+  /* ---------- SECTIONS ---------- */
+  section{position:relative}
+  .sec{padding:104px 0}
+  .sec-head{max-width:620px;margin-bottom:56px}
+  .sec-head h2{font-family:var(--serif);font-weight:600;font-size:clamp(32px,4vw,50px);line-height:1.06;letter-spacing:-.02em;margin:16px 0 14px}
+  .sec-head p{font-size:18px;color:var(--ink-soft)}
+
+  /* problem */
+  .problem{background:var(--paper);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .prob-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:56px;align-items:center}
+  .quote{font-family:var(--serif);font-style:italic;font-size:clamp(26px,3.4vw,40px);line-height:1.25;color:var(--ink);letter-spacing:-.01em}
+  .quote .mk{color:var(--terra)}
+  .quote cite{display:block;font-style:normal;font-family:var(--sans);font-size:15px;font-weight:600;color:var(--muted);margin-top:20px}
+  .prob-stats{display:flex;flex-direction:column;gap:18px}
+  .pstat{background:var(--cream);border:1px solid var(--line);border-radius:18px;padding:22px 24px;position:relative;overflow:hidden}
+  .pstat .n{font-family:var(--serif);font-size:40px;font-weight:700;color:var(--terra);line-height:1}
+  .pstat p{font-size:15px;color:var(--ink-soft);margin-top:6px}
+  .pstat::after{content:"";position:absolute;right:-30px;top:-30px;width:90px;height:90px;border-radius:50%;background:var(--haldi);opacity:.09}
+
+  /* solution stepper */
+  .steps{display:grid;grid-template-columns:repeat(5,1fr);gap:0;position:relative;margin-top:20px}
+  .step{text-align:center;padding:0 14px;position:relative}
+  .step .num{width:62px;height:62px;margin:0 auto 18px;border-radius:20px;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--haldi),var(--terra));color:#fff;font-family:var(--serif);font-weight:700;font-size:24px;
+    box-shadow:0 14px 28px -10px rgba(190,74,47,.55);position:relative;z-index:2}
+  .step h4{font-size:16px;font-weight:700;margin-bottom:6px}
+  .step p{font-size:14px;color:var(--muted)}
+  .steps::before{content:"";position:absolute;top:31px;left:10%;right:10%;height:2px;
+    background:repeating-linear-gradient(90deg,var(--terra) 0 8px,transparent 8px 16px);opacity:.4;z-index:1}
+  .flow-note{text-align:center;margin-top:52px;font-family:var(--serif);font-style:italic;font-size:22px;color:var(--indigo)}
+  .flow-note b{font-style:normal;background:var(--haldi);color:var(--ink);padding:2px 12px;border-radius:8px}
+
+  /* features (dark indigo) */
+  .features{background:radial-gradient(120% 120% at 80% -10%, #2b3363 0%, var(--indigo) 42%, var(--indigo-2) 100%);color:var(--cream)}
+  .features .eyebrow{color:var(--haldi)} .features .eyebrow::before{background:var(--haldi)}
+  .features .sec-head h2{color:#fff} .features .sec-head p{color:#c9cbe0}
+  .feat{display:grid;grid-template-columns:96px 1fr auto;gap:28px;align-items:center;padding:34px 0;border-top:1px solid rgba(255,255,255,.12)}
+  .feat:last-child{border-bottom:1px solid rgba(255,255,255,.12)}
+  .feat .ico{width:96px;height:96px;border-radius:24px;display:flex;align-items:center;justify-content:center;font-size:42px;
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}
+  .feat h3{font-family:var(--serif);font-size:30px;font-weight:600;letter-spacing:-.01em;margin-bottom:8px}
+  .feat h3 .hi{font-family:var(--deva);font-weight:400;color:var(--haldi);font-size:.8em;margin-left:8px}
+  .feat p{color:#c3c6df;max-width:60ch;font-size:16px}
+  .feat .tag{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--haldi);white-space:nowrap}
+  .feat:hover .ico{transform:translateY(-4px);border-color:var(--haldi);transition:.3s}
+
+  /* credibility band */
+  .cred{background:var(--ink);color:var(--cream);padding:64px 0}
+  .cred h3{font-family:var(--serif);font-size:26px;font-weight:500;margin-bottom:8px}
+  .cred p{color:#b6ab99;margin-bottom:34px}
+  .chips{display:flex;flex-wrap:wrap;gap:14px}
+  .chip{display:inline-flex;align-items:center;gap:10px;padding:12px 20px;border-radius:100px;border:1px solid rgba(255,255,255,.16);
+    font-weight:600;font-size:14.5px;background:rgba(255,255,255,.03);transition:.25s}
+  .chip:hover{border-color:var(--haldi);background:rgba(232,163,23,.08)}
+  .chip .d{width:8px;height:8px;border-radius:50%}
+
+  /* impact */
+  .impact-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:26px}
+  .imp{background:var(--cream);border:1px solid var(--line);border-radius:24px;padding:38px 30px;position:relative;overflow:hidden}
+  .imp .big{font-family:var(--serif);font-size:56px;font-weight:700;line-height:1;letter-spacing:-.02em;
+    background:linear-gradient(120deg,var(--terra),var(--haldi-dk));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .imp h4{font-size:17px;font-weight:700;margin:16px 0 8px}
+  .imp p{font-size:14.5px;color:var(--ink-soft)}
+  .imp .corner{position:absolute;right:-24px;bottom:-24px;font-size:120px;opacity:.05}
+
+  /* CTA / footer */
+  .cta{background:linear-gradient(135deg,var(--terra),var(--haldi));color:#fff;text-align:center;padding:96px 0;position:relative;overflow:hidden}
+  .cta h2{font-family:var(--serif);font-size:clamp(34px,4.5vw,58px);font-weight:600;letter-spacing:-.02em;line-height:1.05;margin-bottom:10px}
+  .cta .hi{font-family:var(--deva);font-weight:400}
+  .cta p{font-size:19px;opacity:.94;margin-bottom:34px}
+  .cta .btn-primary{background:#fff;color:var(--terra)}
+  .cta .btn-ghost{border-color:rgba(255,255,255,.6);color:#fff}
+  footer{background:var(--indigo-2);color:#aeb2ce;padding:40px 0;font-size:14px}
+  .foot-in{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
+  .foot-in .brand{color:var(--cream);font-size:19px}
+  .foot-in .brand img{width:34px;height:34px}
+  .badge{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--haldi);border:1px solid rgba(232,163,23,.4);padding:7px 14px;border-radius:100px}
+
+  /* reveal animation */
+  .reveal{opacity:0;transform:translateY(26px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+  .stagger>*{opacity:0;transform:translateY(22px);animation:rise .8s cubic-bezier(.2,.7,.2,1) forwards}
+  @keyframes rise{to{opacity:1;transform:none}}
+
+  @media(max-width:900px){
+    .hero-grid,.prob-grid{grid-template-columns:1fr;gap:44px}
+    .phone-stage{order:-1}
+    .steps{grid-template-columns:repeat(2,1fr);gap:32px 14px}.steps::before{display:none}
+    .feat{grid-template-columns:64px 1fr;gap:18px}.feat .tag{grid-column:2}
+    .feat .ico{width:64px;height:64px;font-size:30px;border-radius:18px}
+    .impact-grid{grid-template-columns:1fr}
+    .nav-links{display:none}
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap nav-in">
+    <a class="brand" href="#top"><img src="assets/logo.png" alt="KalaSetu logo"/>KalaSetu<small>कलासेतु</small></a>
+    <div class="nav-links">
+      <a href="#problem">The Gap</a>
+      <a href="#how">How it works</a>
+      <a href="#features">AI Features</a>
+      <a href="#impact">Impact</a>
+    </div>
+    <a class="btn btn-primary" href="#cta">Download APK <span>↓</span></a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<header class="hero" id="top">
+  <img class="knot-wm" src="assets/logo.png" alt=""/>
+  <div class="thread"></div>
+  <div class="wrap hero-grid">
+    <div class="stagger">
+      <span class="eyebrow" style="animation-delay:.05s">SIH 2026 · MoSJE · PS 26090</span>
+      <h1 style="animation-delay:.12s">
+        <span class="hi">हर कारीगर का</span><br/>
+        <em>virtual</em> business<br/>manager.
+      </h1>
+      <p class="lead" style="animation-delay:.2s">
+        A photo and a voice note become a professional, priced, ready-to-sell listing —
+        and a year-round door to digital markets. No tech skills needed.
+      </p>
+      <div class="hero-cta" style="animation-delay:.28s">
+        <a class="btn btn-primary" href="#cta">Download the APK <span>↓</span></a>
+        <a class="btn btn-ghost" href="#how">See the 30-sec magic →</a>
+      </div>
+      <div class="trust" style="animation-delay:.36s">
+        <span>Powered by</span>
+        <span><b>Vertex AI</b></span><span class="dot"></span>
+        <span><b>Bhashini</b></span><span class="dot"></span>
+        <span><b>ONDC · GeM</b></span>
+      </div>
+    </div>
+
+    <div class="phone-stage stagger" style="animation-delay:.24s">
+      <div class="phone">
+        <div class="screen">
+          <div class="ph-header">
+            <div class="k"><img src="assets/logo.png" alt=""/><b>KalaSetu</b></div>
+            <p>मेरे उत्पाद · My Products</p>
+          </div>
+          <div class="ph-body">
+            <div class="ph-card">
+              <div class="ph-thumb">🧶</div>
+              <div>
+                <h5>बनारसी सिल्क साड़ी</h5>
+                <div class="price">₹2,800</div>
+                <span class="ph-pill" style="background:rgba(190,74,47,.14);color:var(--terra)">बाज़ार में</span>
+              </div>
+            </div>
+            <div class="ph-card">
+              <div class="ph-thumb">🏺</div>
+              <div>
+                <h5>ब्लू पॉटरी फूलदान</h5>
+                <div class="price">₹550</div>
+                <span class="ph-pill" style="background:rgba(46,125,91,.16);color:var(--green)">तैयार</span>
+              </div>
+            </div>
+            <div class="ph-card">
+              <div class="ph-thumb">🧣</div>
+              <div>
+                <h5>पश्मीना शॉल</h5>
+                <div class="price">₹4,200 – ₹5,200</div>
+                <span class="ph-pill" style="background:rgba(232,163,23,.18);color:var(--haldi-dk)">मंज़ूरी बाकी</span>
+              </div>
+            </div>
+          </div>
+          <div class="ph-fab">＋ नया उत्पाद जोड़ें</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- MARQUEE -->
+<div class="marquee">
+  <div class="mq-track">
+    <span>साड़ी <b>Handloom</b> मिट्टी के बर्तन <b>Pottery</b> पश्मीना <b>Pashmina</b> पट्टचित्र <b>Pattachitra</b> जूट <b>Jute</b> पीतल <b>Brass</b> कालीन <b>Rugs</b>&nbsp;</span>
+    <span>साड़ी <b>Handloom</b> मिट्टी के बर्तन <b>Pottery</b> पश्मीना <b>Pashmina</b> पट्टचित्र <b>Pattachitra</b> जूट <b>Jute</b> पीतल <b>Brass</b> कालीन <b>Rugs</b>&nbsp;</span>
+  </div>
+</div>
+
+<!-- PROBLEM -->
+<section class="sec problem" id="problem">
+  <div class="wrap prob-grid">
+    <div class="reveal">
+      <span class="eyebrow">The gap we close</span>
+      <blockquote class="quote" style="margin-top:20px">
+        “The fair ends, the <span class="mk">crowd leaves</span> — and for the rest of the year, our sales fall to almost nothing.”
+        <cite>— Kamla Devi, handloom weaver, after Surajkund Mela</cite>
+      </blockquote>
+    </div>
+    <div class="prob-stats reveal">
+      <div class="pstat"><div class="n">~0</div><p>Year-round sales between periodic physical fairs & exhibitions.</p></div>
+      <div class="pstat"><div class="n">3 walls</div><p>Low digital literacy, language barriers, no cataloging skills — the barrier to e-commerce.</p></div>
+      <div class="pstat"><div class="n">50L+</div><p>MoSJE beneficiaries who could reach digital markets with the right tool.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW / SOLUTION -->
+<section class="sec" id="how">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">How it works</span>
+      <h2>From a photo to a sale in <em style="font-style:italic;color:var(--terra)">30 seconds</em>.</h2>
+      <p>The artisan speaks in their own language and points a camera. KalaSetu does the rest — like a business manager in their pocket.</p>
+    </div>
+    <div class="steps reveal">
+      <div class="step"><div class="num">1</div><h4>Snap</h4><p>Point &amp; shoot the product</p></div>
+      <div class="step"><div class="num">2</div><h4>Enhance</h4><p>AI cleans background &amp; light</p></div>
+      <div class="step"><div class="num">3</div><h4>Speak</h4><p>Describe in हिंदी / regional</p></div>
+      <div class="step"><div class="num">4</div><h4>List</h4><p>SEO title &amp; text, EN + हिंदी</p></div>
+      <div class="step"><div class="num">5</div><h4>Sell</h4><p>Priced &amp; live to buyers</p></div>
+    </div>
+    <p class="flow-note reveal">One tap. <b>Studio-quality listing.</b> Zero technical skill.</p>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="sec features" id="features">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">The AI inside</span>
+      <h2>Three quiet superpowers.</h2>
+      <p>Each one removes a wall between traditional craft and modern commerce.</p>
+    </div>
+
+    <div class="feat reveal">
+      <div class="ico">📸</div>
+      <div>
+        <h3>AI Image Studio <span class="hi">फ़ोटो स्टूडियो</span></h3>
+        <p>A built-in camera that removes clutter, fixes lighting and crops to clean, e-commerce-grade product shots — turning a phone snap into a catalog photo.</p>
+      </div>
+      <div class="tag">Background removal · Auto-enhance</div>
+    </div>
+
+    <div class="feat reveal">
+      <div class="ico">🎙️</div>
+      <div>
+        <h3>Multilingual Voice Cataloger <span class="hi">आवाज़ से लिस्टिंग</span></h3>
+        <p>The artisan speaks in their regional language. In one AI pass it transcribes, translates and writes a professional, SEO-friendly listing in English <em>and</em> हिंदी.</p>
+      </div>
+      <div class="tag">Vertex AI · Bhashini-ready</div>
+    </div>
+
+    <div class="feat reveal">
+      <div class="ico">💰</div>
+      <div>
+        <h3>Dynamic Pricing Assistant <span class="hi">क़ीमत सहायक</span></h3>
+        <p>An ML model reads the product and real market comparables to suggest a fair, competitive price range — with honest, human reasoning the artisan can trust.</p>
+      </div>
+      <div class="tag">ML + comparables</div>
+    </div>
+  </div>
+</section>
+
+<!-- CREDIBILITY -->
+<section class="cred">
+  <div class="wrap reveal">
+    <h3>Built for Digital India — and built to scale.</h3>
+    <p>A govt-aligned, data-resident, production-grade stack.</p>
+    <div class="chips">
+      <span class="chip"><span class="d" style="background:var(--haldi)"></span>Vertex AI · Gemini (asia-south1 · Mumbai)</span>
+      <span class="chip"><span class="d" style="background:var(--terra)"></span>Bhashini — Indic language stack</span>
+      <span class="chip"><span class="d" style="background:var(--green)"></span>ONDC · GeM market linkage</span>
+      <span class="chip"><span class="d" style="background:#6C8AE4"></span>Flutter · cross-platform</span>
+      <span class="chip"><span class="d" style="background:#9C6ADE"></span>FastAPI · Celery · Postgres</span>
+      <span class="chip"><span class="d" style="background:#E4A11B"></span>DPDP-ready · offline-first</span>
+    </div>
+  </div>
+</section>
+
+<!-- IMPACT -->
+<section class="sec" id="impact">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Why it matters</span>
+      <h2>Turning a temporary boost into a <em style="font-style:italic;color:var(--terra)">livelihood</em>.</h2>
+    </div>
+    <div class="impact-grid">
+      <div class="imp reveal"><div class="big">365</div><h4>Days of market access</h4><p>A continuous digital sales channel — no longer dependent on a handful of fairs each year.</p><div class="corner">📅</div></div>
+      <div class="imp reveal"><div class="big">0→1</div><h4>Barrier to entry</h4><p>Voice-first, icon-driven, bilingual — designed so a low-literacy artisan can list in minutes.</p><div class="corner">🚪</div></div>
+      <div class="imp reveal"><div class="big">↑</div><h4>Annual income</h4><p>Professional listings + fair pricing + direct B2B buyers → higher, steadier earnings and real financial independence.</p><div class="corner">📈</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta" id="cta">
+  <div class="wrap reveal">
+    <h2><span class="hi">कला</span> को बाज़ार से जोड़ें.</h2>
+    <p>Try KalaSetu — a virtual business manager for every artisan.</p>
+    <div class="hero-cta" style="justify-content:center">
+      <a class="btn btn-primary" href="#">Download APK <span>↓</span></a>
+      <a class="btn btn-ghost" href="#top">Explore in demo mode</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-in">
+    <a class="brand" href="#top"><img src="assets/logo.png" alt=""/>KalaSetu</a>
+    <span>Ministry of Social Justice &amp; Empowerment · Smart India Hackathon 2026</span>
+    <span class="badge">PS ID 26090</span>
+  </div>
+</footer>
+
+<script>
+  // scroll reveal
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} });
+  },{threshold:.14});
+  document.querySelectorAll('.reveal').forEach((el,i)=>{
+    el.style.transitionDelay = (i%3)*70 + 'ms';
+    io.observe(el);
+  });
+  // subtle parallax on the knot watermark
+  const wm = document.querySelector('.knot-wm');
+  addEventListener('scroll',()=>{ const y=scrollY; if(y<900&&wm) wm.style.transform=`rotate(${-8+y*0.01}deg) translateY(${y*0.08}px)`; },{passive:true});
+</script>
+</body>
+</html>
