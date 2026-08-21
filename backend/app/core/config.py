@@ -32,9 +32,12 @@ class Settings(BaseSettings):
     allowed_image_types: str = "image/jpeg,image/png,image/webp"
     allowed_audio_types: str = "audio/wav,audio/x-wav,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/webm"
 
-    # ---- AI ----
-    gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
+    # ---- AI (Vertex AI primary) ----
+    use_vertex: bool = True                  # True -> Vertex AI (GCP); False -> Gemini Developer API
+    gcp_project: str = ""                    # GCP project id (Vertex)
+    gcp_location: str = "asia-south1"        # Mumbai region — India data residency
+    gemini_api_key: str = ""                 # only used when use_vertex=False (fallback)
+    gemini_model: str = "gemini-2.5-flash"   # same model id on both backends
     ai_daily_quota: int = 50                 # per-user AI calls/day (cost guard)
 
     # Image (F1)

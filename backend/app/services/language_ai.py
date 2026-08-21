@@ -13,11 +13,11 @@ import time
 
 from app.core.config import settings
 from app.models.schemas import CatalogResult
+from app.services import ai_client
 
 log = logging.getLogger("kalasetu.ai")
 
 _MAX_RETRIES = 3
-_TIMEOUT_MS = 30_000
 
 LLM_SYSTEM_PROMPT = (
     "You are an expert e-commerce copywriter for Indian handmade crafts. "
@@ -32,17 +32,11 @@ LLM_SYSTEM_PROMPT = (
 
 
 def _client():
-    from google import genai
-    from google.genai import types
-
-    return genai.Client(
-        api_key=settings.gemini_api_key,
-        http_options=types.HttpOptions(timeout=_TIMEOUT_MS),
-    )
+    return ai_client.build_client()
 
 
 def _gemini_enabled() -> bool:
-    return settings.use_real_ai and bool(settings.gemini_api_key)
+    return ai_client.ai_enabled()
 
 
 def _with_retry(fn, what: str):

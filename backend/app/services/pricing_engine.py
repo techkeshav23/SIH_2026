@@ -98,10 +98,10 @@ def suggest(
         f"finish or festive season."
     )
 
-    # Optional: let Gemini phrase the reasoning more naturally (falls back on any error).
-    from app.core.config import settings
+    # Optional: let the model phrase the reasoning more naturally (falls back on any error).
+    from app.services import ai_client
 
-    if settings.use_real_ai and settings.gemini_api_key:
+    if ai_client.ai_enabled():
         reasoning = _gemini_reasoning(category, material, low, high, comparables, material_cost) or reasoning
 
     return PriceSuggestion(
@@ -116,9 +116,8 @@ def suggest(
 def _gemini_reasoning(category, material, low, high, comparables, material_cost) -> str | None:
     """Short, friendly 2-sentence pricing rationale for the artisan. Best-effort."""
     try:
-        from google import genai
-
         from app.core.config import settings
+        from app.services import ai_client
 
         comps = ", ".join(f"{c.title} ₹{c.price:.0f}" for c in comparables)
         prompt = (
@@ -128,7 +127,7 @@ def _gemini_reasoning(category, material, low, high, comparables, material_cost)
             f"Write a warm, simple 2-sentence rationale (mention comparables and margin). "
             f"Plain text, no markdown."
         )
-        resp = genai.Client(api_key=settings.gemini_api_key).models.generate_content(
+        resp = ai_client.build_client().models.generate_content(
             model=settings.gemini_model, contents=prompt
         )
         return (resp.text or "").strip() or None

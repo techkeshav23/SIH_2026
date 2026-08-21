@@ -75,16 +75,19 @@ See [docs/openapi.yaml](docs/openapi.yaml) — the frozen contract both mobile &
 
 **Mobile:** Flutter · Riverpod · GoRouter · Hive (offline) · easy_localization
 **Backend:** FastAPI · SQLAlchemy · Pydantic v2 · Postgres (Supabase)
-**AI:** **Gemini** (voice→listing, multimodal · pricing reasoning) · rembg/Pillow (image) · scikit-learn (pricing)
+**AI:** **Vertex AI** (Gemini models — voice→listing multimodal · pricing reasoning) · rembg/Pillow (image) · scikit-learn (pricing)
 
-### Enabling real AI (Gemini)
-1. Get a free key: https://aistudio.google.com/apikey
-2. In `backend/.env` set `GEMINI_API_KEY=...` and `USE_REAL_AI=true`
-3. Verify: `cd backend && .venv\Scripts\python.exe test_gemini.py`
+### Enabling real AI (Vertex AI)
+1. Create/select a GCP project and **enable the Vertex AI API**.
+2. Authenticate (dev): `gcloud auth application-default login`
+   (server: set `GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json`)
+3. In `backend/.env`: `USE_REAL_AI=true`, `USE_VERTEX=true`, `GCP_PROJECT=<id>`, `GCP_LOCATION=asia-south1`
+4. Verify: `cd backend && .venv\Scripts\python.exe check_ai.py`
 
-Without a key everything still runs on functional **stubs** (great for offline dev).
-The language layer is provider-agnostic — Bhashini can be plugged in later for
-govt deployment without touching the app.
+Vertex AI is preferred for prod/govt (IAM auth, India data residency in Mumbai).
+Set `USE_VERTEX=false` + `GEMINI_API_KEY` to use the simpler Gemini Developer API instead.
+Without either, everything still runs on functional **stubs** (great for offline dev).
+The language layer is provider-agnostic — Bhashini can be plugged in later too.
 
 ## Team
 
