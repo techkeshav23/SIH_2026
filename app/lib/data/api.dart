@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'local_store.dart';
 import 'models.dart';
 
 /// Change to your machine's LAN IP when testing on a real device,
@@ -38,6 +39,12 @@ class Api {
 
   bool get isLoggedIn => _token != null;
 
+  bool _isOffline(Object e) =>
+      e is DioException &&
+      (e.type == DioExceptionType.connectionError ||
+          e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.unknown);
+
   // ---- auth ----
   Future<String?> requestOtp(String phone) async {
     final r = await _dio.post('/auth/request-otp', data: {'phone': phone});
@@ -51,9 +58,19 @@ class Api {
   }
 
   // ---- products ----
+  /// Online: fetch + cache. Offline: return cached list (best-effort).
   Future<List<Product>> listProducts() async {
-    final r = await _dio.get('/products');
-    return (r.data as List).map((e) => Product.fromJson(e)).toList();
+    try {
+      final r = await _dio.get('/products');
+      await LocalStore.cacheProducts(r.data as List);
+      return (r.data as List).map((e) => Product.fromJson(e)).toList();
+    } catch (e) {
+      if (_isOffline(e)) {
+        final cached = await LocalStore.cachedProducts();
+        return cached.map((e) => Product.fromJson(e)).toList();
+      }
+      rethrow;
+    }
   }
 
   Future<Product> createProduct({String? category, String? material}) async {
@@ -103,6 +120,41 @@ class Api {
     final r = await _dio.post('/pricing/suggest',
         data: {'product_id': productId, 'material_cost': materialCost});
     return PriceSuggestion.fromJson(r.data);
+  }
+
+  // ---- buyers / marketplace ----
+  Future<List<Product>> buyerFeed({String? category}) async {
+    final r = await _dio.get('/buyers/feed',
+        queryParameters: {'category': ?category});
+    return (r.data as List).map((e) => Product.fromJson(e)).toList();
+  }
+
+  Future<void> sendInquiry(String productId, String orgName, String message) async {
+    await _dio.post('/buyers/inquiries',
+        data: {'product_id': productId, 'org_name': orgName, 'message': message});
+  }
+
+  // ---- offline draft sync ----
+  /// Flush locally-queued drafts to the server (create + generate listing).
+  /// Returns number synced.
+  Future<int> syncPendingDrafts() async {
+    final pending = await LocalStore.pendingDrafts();
+    if (pending.isEmpty) return 0;
+    var synced = 0;
+    for (final d in pending) {
+      try {
+        final p = await createProduct(category: d.category, material: d.material);
+        await catalogFromText(p.id, d.text, sourceLang: d.lang);
+        synced++;
+      } catch (_) {
+        // stop on first failure (likely still offline); keep remaining queued
+        break;
+      }
+    }
+    if (synced == pending.length) {
+      await LocalStore.clearPendingDrafts();
+    }
+    return synced;
   }
 
   /// Poll a product until it leaves the `processing` state (max ~30s).

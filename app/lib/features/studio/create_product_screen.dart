@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +10,7 @@ import 'package:record/record.dart';
 import '../../core/l10n.dart';
 import '../../core/theme.dart';
 import '../../data/api.dart';
+import '../../data/local_store.dart';
 import '../../data/models.dart';
 
 /// The hero flow: photo -> AI enhance -> voice/text -> AI listing -> price -> publish.
@@ -87,16 +89,39 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
 
   Future<void> _catalogFromText() async {
     if (_textCtrl.text.trim().isEmpty) return;
+    final lang = ref.read(langProvider) == AppLang.hi ? 'hi' : 'en';
     setState(() { _busy = true; _status = 'Writing listing…'; });
     try {
       await _ensureProduct();
-      final lang = ref.read(langProvider) == AppLang.hi ? 'hi' : 'en';
       final p = await _api.catalogFromText(_product!.id, _textCtrl.text.trim(), sourceLang: lang);
       setState(() => _product = p);
+    } on DioException catch (e) {
+      if (_isOffline(e)) {
+        // No internet — queue the draft locally, sync later from Home.
+        await LocalStore.addPendingDraft(PendingDraft(
+          category: _product?.category ?? '',
+          material: _product?.material ?? '',
+          text: _textCtrl.text.trim(),
+          lang: lang,
+        ));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No internet — saved offline, will sync later')),
+          );
+          context.pop();
+        }
+      } else {
+        rethrow;
+      }
     } finally {
-      setState(() { _busy = false; _status = ''; });
+      if (mounted) setState(() { _busy = false; _status = ''; });
     }
   }
+
+  bool _isOffline(DioException e) =>
+      e.type == DioExceptionType.connectionError ||
+      e.type == DioExceptionType.connectionTimeout ||
+      e.type == DioExceptionType.unknown;
 
   Future<void> _suggestPrice() async {
     setState(() { _busy = true; _status = 'Analysing market…'; });
