@@ -52,10 +52,27 @@ class Settings(BaseSettings):
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
 
+    # ---- Notifications ----
+    notify_provider: str = "log"     # log | fcm | sms
+
     # ---- Observability ----
     sentry_dsn: str = ""             # empty -> Sentry disabled
     log_level: str = "INFO"
     log_json: bool = False           # True -> structured JSON logs (prod)
+
+    # ---- Govt integrations (P5) ----
+    # Bhashini (govt Indic STT/MT) — when on, used for voice transcription+translation
+    # before the LLM writes the listing. Off -> Vertex handles audio directly.
+    use_bhashini_stt: bool = False
+    bhashini_user_id: str = ""
+    bhashini_api_key: str = ""
+    bhashini_pipeline_id: str = ""
+
+    # ONDC / GeM — publish listed products to the open network. Off -> local only.
+    use_ondc: bool = False
+    ondc_subscriber_id: str = ""
+    ondc_signing_key: str = ""
+    ondc_base_url: str = ""
 
     @property
     def is_dev(self) -> bool:

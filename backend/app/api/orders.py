@@ -11,7 +11,7 @@ from app.models.schemas import (
     PaymentCheckout,
     PaymentConfirm,
 )
-from app.services import payments
+from app.services import notifications, payments
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -53,6 +53,7 @@ def create_order(
     db.add(order)
     db.commit()
     db.refresh(order)
+    notifications.order_placed(order.artisan_id, order.id)
     return order
 
 
@@ -89,6 +90,7 @@ def accept_order(
     o.status = "accepted"
     db.commit()
     db.refresh(o)
+    notifications.order_accepted(o.buyer_id, o.id)
     return o
 
 
@@ -166,4 +168,5 @@ def confirm_payment(
     o.status = "paid"
     db.commit()
     db.refresh(o)
+    notifications.order_paid(o.artisan_id, o.id)
     return o

@@ -59,8 +59,16 @@ def update_product(
     db: Session = Depends(get_db),
 ):
     p = _owned(db, user, product_id)
+    was_listed = p.status == "listed"
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(p, field, value)
     db.commit()
     db.refresh(p)
+
+    # On transition to 'listed', publish to ONDC/GeM (best-effort, no-op if disabled)
+    if p.status == "listed" and not was_listed:
+        from app.services import ondc
+
+        ondc.publish_product(p)
+
     return p

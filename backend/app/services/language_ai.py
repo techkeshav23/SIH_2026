@@ -55,7 +55,24 @@ def _with_retry(fn, what: str):
 
 # ---------- public API (never raises: degrades to stub) ----------
 def catalog_from_audio(audio_bytes: bytes, mime_type: str, source_lang: str = "hi") -> CatalogResult:
-    """Voice note -> full listing. Falls back to a stub if Gemini is unavailable."""
+    """Voice note -> full listing. Falls back to a stub if AI is unavailable.
+
+    Two paths:
+      - Bhashini (govt) STT+MT -> LLM writes the listing (when USE_BHASHINI_STT)
+      - Vertex/Gemini multimodal handles the audio directly (default)
+    """
+    from app.services import bhashini
+
+    if bhashini.enabled():
+        try:
+            transcript, english = _with_retry(
+                lambda: bhashini.transcribe_translate(audio_bytes, source_lang), "bhashini")
+            listing = generate_listing(english)
+            listing.transcript = transcript
+            return listing
+        except Exception:  # noqa: BLE001
+            log.error("Bhashini path failed — falling back")
+
     if _gemini_enabled():
         try:
             return _with_retry(lambda: _gemini_audio(audio_bytes, mime_type, source_lang), "audio")
