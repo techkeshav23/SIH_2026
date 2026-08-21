@@ -52,6 +52,9 @@ class HomeScreen extends ConsumerWidget {
                 icon: Icons.translate_rounded, tooltip: 'Language',
                 onTap: () => ref.read(langProvider.notifier).state = lang == AppLang.hi ? AppLang.en : AppLang.hi),
               _HeaderIcon(icon: Icons.logout_rounded, tooltip: 'Logout', onTap: () async {
+                final ok = await confirmDialog(context,
+                    title: 'Logout', message: 'Sign out of KalaSetu?', confirm: 'Logout', danger: true);
+                if (!ok || !context.mounted) return;
                 await ref.read(apiProvider).logout();
                 if (context.mounted) context.go('/login');
               }),

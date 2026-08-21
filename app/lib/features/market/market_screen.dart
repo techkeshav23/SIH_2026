@@ -189,17 +189,23 @@ class _InquirySheetState extends State<_InquirySheet> {
   bool _sending = false;
 
   Future<void> _send() async {
-    if (_org.text.trim().isEmpty) return;
+    if (_org.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter your organization name')));
+      return;
+    }
+    final messenger = ScaffoldMessenger.of(context);
+    final nav = Navigator.of(context);
     setState(() => _sending = true);
     try {
       await widget.api
           .sendInquiry(widget.p.id, _org.text.trim(), _msg.text.trim());
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Inquiry sent to artisan ✓')),
-        );
-      }
+      nav.pop();
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Inquiry sent to artisan ✓')));
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not send inquiry — please try again')));
     } finally {
       if (mounted) setState(() => _sending = false);
     }

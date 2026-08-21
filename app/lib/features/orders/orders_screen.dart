@@ -125,7 +125,15 @@ class _OrderCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => _act(context, () => api.rejectOrder(order.id), 'rejected'),
+                    onPressed: () async {
+                      final ok = await confirmDialog(context,
+                          title: 'Reject order?',
+                          message: 'This will decline the buyer\'s order.',
+                          confirm: 'Reject', danger: true);
+                      if (ok && context.mounted) {
+                        await _act(context, () => api.rejectOrder(order.id), 'rejected');
+                      }
+                    },
                     child: const Text('Reject'),
                   ),
                 ),

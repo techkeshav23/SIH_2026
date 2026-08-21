@@ -2,12 +2,15 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'demo.dart';
 import 'local_store.dart';
 import 'models.dart';
 
-/// Change to your machine's LAN IP when testing on a real device,
-/// e.g. http://192.168.1.5:8000. Android emulator uses 10.0.2.2.
-const String kBaseUrl = 'http://10.0.2.2:8000';
+/// Backend base URL. Override at build time for a real device / deployment:
+///   flutter build apk --dart-define=BASE_URL=http://192.168.1.5:8000
+/// Android emulator uses 10.0.2.2 (host loopback) by default.
+const String kBaseUrl =
+    String.fromEnvironment('BASE_URL', defaultValue: 'http://10.0.2.2:8000');
 
 final apiProvider = Provider<Api>((ref) => Api());
 
@@ -16,6 +19,7 @@ class Api {
   String? _token;
   String? _refreshToken;
   String? _role; // 'artisan' | 'buyer'
+  bool demoMode = false; // offline demo — serves canned data, no backend needed
 
   Api() : _dio = Dio(BaseOptions(baseUrl: kBaseUrl)) {
     _dio.interceptors.add(InterceptorsWrapper(
@@ -50,24 +54,41 @@ class Api {
     _token = prefs.getString('token');
     _refreshToken = prefs.getString('refresh_token');
     _role = prefs.getString('role');
+    demoMode = prefs.getBool('demo') ?? false;
+  }
+
+  /// Enter offline demo mode as [role] ('artisan' | 'buyer') — no backend needed.
+  Future<void> enterDemo(String role) async {
+    demoMode = true;
+    _token = 'demo';
+    _refreshToken = null;
+    _role = role;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('token', 'demo');
+    await prefs.setString('role', role);
+    await prefs.setBool('demo', true);
   }
 
   Future<void> _saveTokens(String access, String refresh, String role) async {
     _token = access;
     _refreshToken = refresh;
     _role = role;
+    demoMode = false;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('token', access);
     await prefs.setString('refresh_token', refresh);
     await prefs.setString('role', role);
+    await prefs.setBool('demo', false);
   }
 
   Future<void> logout() async {
     _token = _refreshToken = _role = null;
+    demoMode = false;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');
     await prefs.remove('refresh_token');
     await prefs.remove('role');
+    await prefs.remove('demo');
   }
 
   Future<bool> _refreshAccess() async {
@@ -119,6 +140,7 @@ class Api {
   // ---- products ----
   /// Online: fetch + cache. Offline: return cached list (best-effort).
   Future<List<Product>> listProducts() async {
+    if (demoMode) return Demo.products.map((e) => Product.fromJson(e)).toList();
     try {
       final r = await _dio.get('/products');
       await LocalStore.cacheProducts(r.data as List);
@@ -133,23 +155,30 @@ class Api {
   }
 
   Future<Product> createProduct({String? category, String? material}) async {
+    if (demoMode) return Product.fromJson(Demo.newProduct(category, material));
     final r = await _dio.post('/products',
         data: {'category': category, 'material': material});
     return Product.fromJson(r.data);
   }
 
   Future<Product> getProduct(String id) async {
+    if (demoMode) return Product.fromJson(Demo.byId(id) ?? Demo.products.first);
     final r = await _dio.get('/products/$id');
     return Product.fromJson(r.data);
   }
 
   Future<Product> updateProduct(String id, Map<String, dynamic> patch) async {
+    if (demoMode) return Product.fromJson(Demo.update(id, patch));
     final r = await _dio.patch('/products/$id', data: patch);
     return Product.fromJson(r.data);
   }
 
   // ---- AI ----
   Future<void> enhanceImage(String productId, String filePath) async {
+    if (demoMode) {
+      Demo.enhance(productId);
+      return;
+    }
     final form = FormData.fromMap({
       'product_id': productId,
       'file': await MultipartFile.fromFile(filePath),
@@ -169,6 +198,7 @@ class Api {
 
   Future<Product> catalogFromText(String productId, String text,
       {String sourceLang = 'hi'}) async {
+    if (demoMode) return Product.fromJson(Demo.catalog(productId, text));
     final r = await _dio.post('/ai/catalog-from-text',
         data: {'product_id': productId, 'text': text, 'source_lang': sourceLang});
     return Product.fromJson(r.data);
@@ -176,6 +206,7 @@ class Api {
 
   // ---- pricing ----
   Future<PriceSuggestion> suggestPrice(String productId, {double? materialCost}) async {
+    if (demoMode) return PriceSuggestion.fromJson(Demo.price(productId));
     final r = await _dio.post('/pricing/suggest',
         data: {'product_id': productId, 'material_cost': materialCost});
     return PriceSuggestion.fromJson(r.data);
@@ -183,52 +214,63 @@ class Api {
 
   // ---- buyers / marketplace ----
   Future<List<Product>> buyerFeed({String? category}) async {
+    if (demoMode) {
+      return (Demo.listed()['items'] as List).map((e) => Product.fromJson(e)).toList();
+    }
     final r = await _dio.get('/buyers/feed',
         queryParameters: {'category': ?category});
     return (r.data as List).map((e) => Product.fromJson(e)).toList();
   }
 
   Future<void> sendInquiry(String productId, String orgName, String message) async {
+    if (demoMode) return;
     await _dio.post('/buyers/inquiries',
         data: {'product_id': productId, 'org_name': orgName, 'message': message});
   }
 
   // ---- dashboard (artisan) ----
   Future<ArtisanStats> artisanStats() async {
+    if (demoMode) return ArtisanStats.fromJson(Demo.stats());
     final r = await _dio.get('/dashboard/artisan');
     return ArtisanStats.fromJson(r.data);
   }
 
   // ---- orders (artisan side) ----
   Future<List<Order>> incomingOrders() async {
+    if (demoMode) return Demo.orders.map((e) => Order.fromJson(e)).toList();
     final r = await _dio.get('/orders/incoming');
     return (r.data as List).map((e) => Order.fromJson(e)).toList();
   }
 
   Future<Order> acceptOrder(String id) async {
+    if (demoMode) return Order.fromJson(Demo.setOrderStatus(id, 'accepted'));
     final r = await _dio.post('/orders/$id/accept');
     return Order.fromJson(r.data);
   }
 
   Future<Order> rejectOrder(String id) async {
+    if (demoMode) return Order.fromJson(Demo.setOrderStatus(id, 'rejected'));
     final r = await _dio.post('/orders/$id/reject');
     return Order.fromJson(r.data);
   }
 
   // ---- orders (buyer side) ----
   Future<Order> placeOrder(String productId, int quantity, {String? note}) async {
+    if (demoMode) return Order.fromJson(Demo.placeOrder(productId, quantity));
     final r = await _dio.post('/orders',
         data: {'product_id': productId, 'quantity': quantity, 'note': note});
     return Order.fromJson(r.data);
   }
 
   Future<List<Order>> myOrders() async {
+    if (demoMode) return Demo.orders.map((e) => Order.fromJson(e)).toList();
     final r = await _dio.get('/orders');
     return (r.data as List).map((e) => Order.fromJson(e)).toList();
   }
 
   /// Pay (mock gateway) then confirm — returns the paid order.
   Future<Order> payAndConfirm(String orderId) async {
+    if (demoMode) return Order.fromJson(Demo.setOrderStatus(orderId, 'paid'));
     final checkout = await _dio.post('/orders/$orderId/pay');
     final paymentId = checkout.data['provider_order_id'];
     final r = await _dio.post('/orders/$orderId/confirm-payment',

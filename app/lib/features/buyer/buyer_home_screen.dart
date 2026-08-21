@@ -35,6 +35,9 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
             tooltip: 'Logout',
             icon: const Icon(Icons.logout),
             onPressed: () async {
+              final ok = await confirmDialog(context,
+                  title: 'Logout', message: 'Sign out of KalaSetu?', confirm: 'Logout', danger: true);
+              if (!ok || !context.mounted) return;
               await ref.read(apiProvider).logout();
               if (context.mounted) context.go('/login');
             },
@@ -236,7 +239,7 @@ class _OrderSheetState extends State<_OrderSheet> {
                     ),
                     _StepBtn(
                       icon: Icons.add,
-                      onTap: () => setState(() => _qty++),
+                      onTap: () => setState(() { if (_qty < 99) _qty++; }),
                     ),
                   ],
                 ),

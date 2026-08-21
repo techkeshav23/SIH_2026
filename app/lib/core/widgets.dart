@@ -1,6 +1,49 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'l10n.dart';
 import 'theme.dart';
+
+/// Friendly, localized labels for raw status codes (en / hi).
+const Map<String, List<String>> _statusLabels = {
+  'draft': ['Draft', 'ड्राफ़्ट'],
+  'processing': ['Processing', 'तैयार हो रहा'],
+  'ready': ['Ready', 'तैयार'],
+  'listed': ['Listed', 'बाज़ार में'],
+  'pending': ['Pending', 'मंज़ूरी बाकी'],
+  'accepted': ['Accepted', 'स्वीकृत'],
+  'rejected': ['Rejected', 'अस्वीकृत'],
+  'paid': ['Paid', 'भुगतान हुआ'],
+  'shipped': ['Shipped', 'भेजा गया'],
+  'completed': ['Completed', 'पूर्ण'],
+  'cancelled': ['Cancelled', 'रद्द'],
+};
+
+/// Confirmation dialog for irreversible actions. Returns true if confirmed.
+Future<bool> confirmDialog(
+  BuildContext context, {
+  required String title,
+  required String message,
+  String confirm = 'Confirm',
+  bool danger = false,
+}) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (c) => AlertDialog(
+      title: Text(title),
+      content: Text(message),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+        FilledButton(
+          onPressed: () => Navigator.pop(c, true),
+          style: danger ? FilledButton.styleFrom(backgroundColor: AppColors.danger) : null,
+          child: Text(confirm),
+        ),
+      ],
+    ),
+  );
+  return ok ?? false;
+}
 
 /// Unified status -> colour mapping (products + orders).
 Color statusColor(String status) {
@@ -25,13 +68,15 @@ Color statusColor(String status) {
   }
 }
 
-/// Small pill showing a status with a soft tinted background.
-class KStatusPill extends StatelessWidget {
+/// Small pill showing a friendly, localized status with a soft tinted background.
+class KStatusPill extends ConsumerWidget {
   const KStatusPill(this.status, {super.key});
   final String status;
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = statusColor(status);
+    final hi = ref.watch(langProvider) == AppLang.hi;
+    final label = _statusLabels[status]?[hi ? 1 : 0] ?? status;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
       decoration: BoxDecoration(
@@ -43,7 +88,7 @@ class KStatusPill extends StatelessWidget {
         children: [
           Container(width: 6, height: 6, decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
           const SizedBox(width: 6),
-          Text(status,
+          Text(label,
               style: TextStyle(color: c, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.1)),
         ],
       ),
@@ -115,6 +160,14 @@ class KNetImage extends StatelessWidget {
       width: width, height: height, color: AppColors.surfaceAlt,
       child: const Center(child: Icon(Icons.image_outlined, color: AppColors.muted)),
     );
+    // demo images are bundled assets ("asset:<path>")
+    if (url != null && url!.startsWith('asset:')) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: Image.asset(url!.substring(6), width: width, height: height, fit: fit,
+            errorBuilder: (_, _, _) => ph),
+      );
+    }
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
       child: url == null

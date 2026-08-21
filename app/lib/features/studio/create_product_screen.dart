@@ -1,11 +1,8 @@
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:record/record.dart';
 
 import '../../core/l10n.dart';
 import '../../core/theme.dart';
@@ -23,13 +20,11 @@ class CreateProductScreen extends ConsumerStatefulWidget {
 
 class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
   final _picker = ImagePicker();
-  final _recorder = AudioRecorder();
   final _textCtrl = TextEditingController();
 
   Product? _product;
   bool _busy = false;
   String _status = '';
-  bool _recording = false;
   PriceSuggestion? _price;
 
   Api get _api => ref.read(apiProvider);
@@ -38,8 +33,15 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
     _product ??= await _api.createProduct();
   }
 
+  void _snack(String msg) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    }
+  }
+
   Future<void> _takePhoto() async {
-    final file = await _picker.pickImage(source: ImageSource.camera, imageQuality: 90);
+    final file = await _picker.pickImage(
+        source: ImageSource.camera, imageQuality: 90);
     if (file == null) return;
     setState(() { _busy = true; _status = 'AI enhancing photo…'; });
     try {
@@ -47,49 +49,18 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
       await _api.enhanceImage(_product!.id, file.path);
       final ready = await _api.pollUntilReady(_product!.id);
       setState(() => _product = ready);
+    } catch (_) {
+      _snack('Enhancement failed — please try again');
     } finally {
-      setState(() { _busy = false; _status = ''; });
-    }
-  }
-
-  Future<void> _toggleRecord() async {
-    if (_recording) {
-      final path = await _recorder.stop();
-      setState(() => _recording = false);
-      if (path != null) await _catalogFromVoice(path);
-    } else {
-      if (await _recorder.hasPermission()) {
-        final dir = await getTempDir();
-        // WAV is reliably accepted by Gemini's multimodal audio input.
-        await _recorder.start(
-          const RecordConfig(encoder: AudioEncoder.wav),
-          path: '$dir/note.wav',
-        );
-        setState(() => _recording = true);
-      }
-    }
-  }
-
-  Future<String> getTempDir() async {
-    // path_provider is imported transitively via record on device; fallback:
-    return Directory.systemTemp.path;
-  }
-
-  Future<void> _catalogFromVoice(String path) async {
-    setState(() { _busy = true; _status = 'Listening & writing listing…'; });
-    try {
-      await _ensureProduct();
-      final lang = ref.read(langProvider) == AppLang.hi ? 'hi' : 'en';
-      await _api.catalogFromVoice(_product!.id, path, sourceLang: lang);
-      final ready = await _api.pollUntilReady(_product!.id);
-      setState(() => _product = ready);
-    } finally {
-      setState(() { _busy = false; _status = ''; });
+      if (mounted) setState(() { _busy = false; _status = ''; });
     }
   }
 
   Future<void> _catalogFromText() async {
-    if (_textCtrl.text.trim().isEmpty) return;
+    if (_textCtrl.text.trim().isEmpty) {
+      _snack('Describe your product first');
+      return;
+    }
     final lang = ref.read(langProvider) == AppLang.hi ? 'hi' : 'en';
     setState(() { _busy = true; _status = 'Writing listing…'; });
     try {
@@ -131,14 +102,28 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
       final price = await _api.suggestPrice(_product!.id);
       final p = await _api.getProduct(_product!.id);
       setState(() { _price = price; _product = p; });
+    } catch (_) {
+      _snack('Could not fetch price — please try again');
     } finally {
-      setState(() { _busy = false; _status = ''; });
+      if (mounted) setState(() { _busy = false; _status = ''; });
     }
   }
 
   Future<void> _publish() async {
-    await _api.updateProduct(_product!.id, {'status': 'listed'});
-    if (mounted) context.pop();
+    final ok = await confirmDialog(context,
+        title: 'List on marketplace?',
+        message: 'This makes the product visible to B2B buyers.',
+        confirm: 'List');
+    if (!ok) return;
+    setState(() { _busy = true; _status = 'Listing…'; });
+    try {
+      await _api.updateProduct(_product!.id, {'status': 'listed'});
+      if (mounted) context.pop();
+    } catch (_) {
+      _snack('Could not list — please try again');
+    } finally {
+      if (mounted) setState(() { _busy = false; _status = ''; });
+    }
   }
 
   @override
@@ -182,24 +167,19 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    FilledButton.icon(
-                      onPressed: _busy ? null : _toggleRecord,
-                      style: FilledButton.styleFrom(
-                          backgroundColor: _recording ? AppColors.danger : AppColors.primary),
-                      icon: Icon(_recording ? Icons.stop_rounded : Icons.mic_rounded),
-                      label: Text(_recording ? 'Stop' : T.of(context, lang, 'record_voice')),
-                    ),
-                    Gap.m,
-                    Row(
-                      children: [
-                        const Expanded(child: Divider()),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Text('या टाइप करें / or type',
-                              style: text.labelSmall),
-                        ),
-                        const Expanded(child: Divider()),
-                      ],
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceAlt,
+                        borderRadius: BorderRadius.circular(Radii.md),
+                        border: Border.all(color: AppColors.line),
+                      ),
+                      child: Row(children: [
+                        const Icon(Icons.mic_none_rounded, size: 18, color: AppColors.muted),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text('Voice input coming soon — describe your product by typing',
+                            style: text.labelSmall)),
+                      ]),
                     ),
                     Gap.m,
                     TextField(
@@ -210,10 +190,10 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
                       ),
                     ),
                     Gap.s,
-                    OutlinedButton.icon(
+                    FilledButton.icon(
                       onPressed: _busy ? null : _catalogFromText,
-                      icon: const Icon(Icons.edit_note_rounded),
-                      label: const Text('Generate listing'),
+                      icon: const Icon(Icons.auto_awesome_rounded),
+                      label: const Text('Generate listing with AI'),
                     ),
                     if (p?.titleEn != null) ...[
                       Gap.m,

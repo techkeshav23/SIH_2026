@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -23,8 +24,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   String? _error;
 
   Api get _api => ref.read(apiProvider);
+  String get _home => _role == Role.artisan ? '/home' : '/buyer/home';
 
   Future<void> _sendOtp() async {
+    if (_phone.text.trim().length != 10) {
+      setState(() => _error = 'Enter a valid 10-digit phone number');
+      return;
+    }
     setState(() { _loading = true; _error = null; });
     try {
       final devOtp = _role == Role.artisan
@@ -32,27 +38,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           : await _api.buyerRequestOtp(_phone.text.trim());
       setState(() { _otpSent = true; if (devOtp != null) _otp.text = devOtp; });
     } catch (e) {
-      setState(() => _error = 'Failed to send OTP — is the backend running?');
+      setState(() => _error = 'Could not reach server. Try "Continue in demo mode".');
     } finally {
       setState(() => _loading = false);
     }
   }
 
   Future<void> _verify() async {
+    if (_otp.text.trim().length != 6) {
+      setState(() => _error = 'Enter the 6-digit OTP');
+      return;
+    }
     setState(() { _loading = true; _error = null; });
     try {
       if (_role == Role.artisan) {
         await _api.verifyOtp(_phone.text.trim(), _otp.text.trim());
-        if (mounted) context.go('/home');
       } else {
         await _api.buyerVerifyOtp(_phone.text.trim(), _otp.text.trim());
-        if (mounted) context.go('/buyer/home');
       }
+      if (mounted) context.go(_home);
     } catch (e) {
       setState(() => _error = 'Invalid OTP');
     } finally {
       setState(() => _loading = false);
     }
+  }
+
+  Future<void> _enterDemo() async {
+    await _api.enterDemo(_role == Role.artisan ? 'artisan' : 'buyer');
+    if (mounted) context.go(_home);
   }
 
   @override
@@ -61,10 +75,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Scaffold(
       body: Column(
         children: [
-          // hero
           Container(
             width: double.infinity,
-            padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 56, 24, 48),
+            padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 48, 24, 44),
             decoration: const BoxDecoration(
               gradient: Decor.heroGradient,
               borderRadius: BorderRadius.vertical(bottom: Radius.circular(Radii.xl)),
@@ -72,12 +85,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: Column(
               children: [
                 Container(
-                  width: 78, height: 78,
+                  width: 96, height: 96,
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(Radii.lg),
+                    boxShadow: Decor.lift,
                   ),
-                  child: const Icon(Icons.storefront_rounded, size: 42, color: Colors.white),
+                  child: Image.asset('assets/icon/logo.png', fit: BoxFit.contain),
                 ),
                 const SizedBox(height: 16),
                 Text(T.of(context, lang, 'app_name'),
@@ -111,9 +126,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   TextField(
                     controller: _phone,
                     keyboardType: TextInputType.phone,
+                    maxLength: 10,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(10),
+                    ],
                     decoration: InputDecoration(
                       labelText: T.of(context, lang, 'phone'),
                       prefixIcon: const Icon(Icons.phone_outlined),
+                      prefixText: '+91  ',
+                      counterText: '',
                     ),
                   ),
                   if (_otpSent) ...[
@@ -121,9 +143,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     TextField(
                       controller: _otp,
                       keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(6),
+                      ],
                       decoration: const InputDecoration(
                         labelText: 'OTP',
                         prefixIcon: Icon(Icons.lock_outline),
+                        counterText: '',
                       ),
                     ),
                   ],
@@ -135,12 +163,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Expanded(child: Text(_error!, style: const TextStyle(color: AppColors.danger))),
                     ]),
                   ],
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 22),
                   FilledButton(
                     onPressed: _loading ? null : (_otpSent ? _verify : _sendOtp),
                     child: _loading
                         ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                         : Text(T.of(context, lang, _otpSent ? 'verify' : 'send_otp')),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(children: [
+                    const Expanded(child: Divider()),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Text('or', style: Theme.of(context).textTheme.labelSmall),
+                    ),
+                    const Expanded(child: Divider()),
+                  ]),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _loading ? null : _enterDemo,
+                    icon: const Icon(Icons.play_circle_outline),
+                    label: const Text('Continue in demo mode'),
                   ),
                   const SizedBox(height: 8),
                   Center(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -36,34 +37,65 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   }
 
   Future<void> _load() async {
-    final p = await _api.getProduct(widget.productId);
-    _titleHi.text = p.titleHi ?? '';
-    _titleEn.text = p.titleEn ?? '';
-    _descHi.text = p.descHi ?? '';
-    _price.text = (p.finalPrice ?? p.suggestedPriceMax ?? '').toString();
-    setState(() { _p = p; _loading = false; });
+    try {
+      final p = await _api.getProduct(widget.productId);
+      _titleHi.text = p.titleHi ?? '';
+      _titleEn.text = p.titleEn ?? '';
+      _descHi.text = p.descHi ?? '';
+      _price.text = (p.finalPrice ?? p.suggestedPriceMax ?? '').toString();
+      setState(() { _p = p; _loading = false; });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not load product')));
+        context.pop();
+      }
+    }
   }
 
   Future<void> _save({bool publish = false}) async {
+    final price = double.tryParse(_price.text.trim());
+    if (publish) {
+      if (_titleHi.text.trim().isEmpty && _titleEn.text.trim().isEmpty) {
+        _snack('Add a title before listing');
+        return;
+      }
+      if (price == null || price <= 0) {
+        _snack('Set a valid price before listing');
+        return;
+      }
+      final ok = await confirmDialog(context,
+          title: 'List on marketplace?',
+          message: 'This makes the product visible to B2B buyers.',
+          confirm: 'List');
+      if (!ok) return;
+    }
     setState(() => _saving = true);
     try {
       final patch = <String, dynamic>{
         'title_hi': _titleHi.text,
         'title_en': _titleEn.text,
         'desc_hi': _descHi.text,
-        if (_price.text.trim().isNotEmpty) 'final_price': double.tryParse(_price.text.trim()),
+        'final_price': ?price,
         if (publish) 'status': 'listed',
       };
       final p = await _api.updateProduct(widget.productId, patch);
       setState(() => _p = p);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(publish ? 'Listed on marketplace ✓' : 'Saved ✓')),
-        );
+        _snack(publish ? 'Listed on marketplace ✓' : 'Saved ✓');
         if (publish) context.pop();
       }
+    } catch (_) {
+      _snack('Could not save — please try again');
     } finally {
-      setState(() => _saving = false);
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _snack(String msg) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     }
   }
 
@@ -128,7 +160,9 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                   ),
                   Gap.m,
                 ],
-                _field('Final price (₹)', _price, keyboard: TextInputType.number),
+                _field('Final price (₹)', _price,
+                    keyboard: const TextInputType.numberWithOptions(decimal: true),
+                    formatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))]),
                 Gap.l,
                 Row(
                   children: [
@@ -155,13 +189,14 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   }
 
   Widget _field(String label, TextEditingController c,
-          {int maxLines = 1, TextInputType? keyboard}) =>
+          {int maxLines = 1, TextInputType? keyboard, List<TextInputFormatter>? formatters}) =>
       Padding(
         padding: const EdgeInsets.only(bottom: 12),
         child: TextField(
           controller: c,
           maxLines: maxLines,
           keyboardType: keyboard,
+          inputFormatters: formatters,
           decoration: InputDecoration(labelText: label),
         ),
       );
