@@ -151,3 +151,67 @@ class InquiryOut(BaseModel):
     message: str
     status: str
     created_at: datetime
+
+
+# ---- Buyer auth ----
+class BuyerOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    phone: str
+    name: str | None = None
+    org_name: str | None = None
+    gstin: str | None = None
+    type: str = "B2B"
+
+
+class BuyerUpdate(BaseModel):
+    name: str | None = None
+    org_name: str | None = None
+    gstin: str | None = None
+    type: str | None = None
+
+
+class BuyerAuthToken(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    buyer: BuyerOut
+
+
+# ---- Orders ----
+class OrderCreate(BaseModel):
+    product_id: str
+    quantity: int = 1
+    note: str | None = None
+
+
+class OrderOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    product_id: str
+    buyer_id: str
+    artisan_id: str
+    quantity: int
+    unit_price: float
+    total_price: float
+    status: str
+    note: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+# ---- Payments ----
+class PaymentCheckout(BaseModel):
+    """Returned to the client to launch the payment sheet (e.g. Razorpay)."""
+    order_id: str
+    payment_id: str
+    provider: str
+    provider_order_id: str
+    amount: float
+    currency: str = "INR"
+    key_id: str | None = None  # publishable key for the client SDK
+
+
+class PaymentConfirm(BaseModel):
+    provider_payment_id: str | None = None
+    signature: str | None = None

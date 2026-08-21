@@ -24,6 +24,14 @@ def create_refresh_token(user_id: str) -> str:
     return _encode(user_id, "refresh", timedelta(days=settings.refresh_token_ttl_days))
 
 
+def create_buyer_access_token(buyer_id: str) -> str:
+    return _encode(buyer_id, "buyer", timedelta(minutes=settings.access_token_ttl_min))
+
+
+def create_buyer_refresh_token(buyer_id: str) -> str:
+    return _encode(buyer_id, "buyer_refresh", timedelta(days=settings.refresh_token_ttl_days))
+
+
 def decode_token(token: str, expected_type: str = "access") -> str | None:
     """Return the subject (user id) if the token is valid and of the right type."""
     try:

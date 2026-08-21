@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.core import quota
 from app.core.db import get_db
 from app.core.security import decode_token
-from app.models import User
+from app.models import Buyer, User
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -33,3 +33,18 @@ def enforce_ai_quota(user: User = Depends(get_current_user)) -> User:
             "Daily AI limit reached — try again tomorrow",
         )
     return user
+
+
+def get_current_buyer(
+    creds: HTTPAuthorizationCredentials | None = Depends(bearer),
+    db: Session = Depends(get_db),
+) -> Buyer:
+    if creds is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing token")
+    buyer_id = decode_token(creds.credentials, expected_type="buyer")
+    if not buyer_id:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired buyer token")
+    buyer = db.get(Buyer, buyer_id)
+    if not buyer:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Buyer not found")
+    return buyer

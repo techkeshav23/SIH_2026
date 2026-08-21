@@ -17,6 +17,8 @@ tags:
   - name: ai
   - name: pricing
   - name: buyers
+  - name: buyer
+  - name: orders
 
 paths:
   /health:
@@ -226,6 +228,78 @@ paths:
       responses:
         "201": { description: Inquiry created, content: { application/json: { schema: { $ref: '#/components/schemas/Inquiry' } } } }
 
+  /buyer/auth/request-otp:
+    post:
+      tags: [buyer]
+      summary: Request OTP for a buyer phone
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [phone], properties: { phone: { type: string } } } } } }
+      responses: { "200": { description: OTP sent } }
+  /buyer/auth/verify-otp:
+    post:
+      tags: [buyer]
+      summary: Verify buyer OTP, get buyer token
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [phone, otp], properties: { phone: { type: string }, otp: { type: string } } } } } }
+      responses: { "200": { description: Buyer auth token, content: { application/json: { schema: { $ref: '#/components/schemas/BuyerAuthToken' } } } } }
+  /buyer/me:
+    get:
+      tags: [buyer]
+      summary: Current buyer profile
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: Buyer, content: { application/json: { schema: { $ref: '#/components/schemas/Buyer' } } } } }
+    patch:
+      tags: [buyer]
+      summary: Update buyer (name, org, GSTIN)
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: Updated buyer } }
+
+  /orders:
+    post:
+      tags: [orders]
+      summary: "Buyer places an order on a listed product"
+      security: [{ bearerAuth: [] }]
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/OrderCreate' } } } }
+      responses: { "201": { description: Order, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } } }
+    get:
+      tags: [orders]
+      summary: "Buyer's own orders"
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: Orders, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Order' } } } } } }
+  /orders/incoming:
+    get:
+      tags: [orders]
+      summary: "Artisan's incoming orders"
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: Orders, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Order' } } } } } }
+  /orders/{order_id}/accept:
+    post:
+      tags: [orders]
+      summary: "Artisan accepts a pending order"
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: order_id, required: true, schema: { type: string } }]
+      responses: { "200": { description: Order, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } } }
+  /orders/{order_id}/reject:
+    post:
+      tags: [orders]
+      summary: "Artisan rejects a pending order"
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: order_id, required: true, schema: { type: string } }]
+      responses: { "200": { description: Order, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } } }
+  /orders/{order_id}/pay:
+    post:
+      tags: [orders]
+      summary: "Buyer initiates payment on an accepted order"
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: order_id, required: true, schema: { type: string } }]
+      responses: { "200": { description: Checkout, content: { application/json: { schema: { $ref: '#/components/schemas/PaymentCheckout' } } } } }
+  /orders/{order_id}/confirm-payment:
+    post:
+      tags: [orders]
+      summary: "Buyer confirms a completed payment (verify + mark paid)"
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: order_id, required: true, schema: { type: string } }]
+      requestBody: { content: { application/json: { schema: { type: object, properties: { provider_payment_id: { type: string }, signature: { type: string } } } } } }
+      responses: { "200": { description: Order, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } } }
+
 components:
   securitySchemes:
     bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
@@ -328,3 +402,50 @@ components:
         message: { type: string }
         status: { type: string, example: new }
         created_at: { type: string, format: date-time }
+    Buyer:
+      type: object
+      properties:
+        id: { type: string }
+        phone: { type: string }
+        name: { type: string, nullable: true }
+        org_name: { type: string, nullable: true }
+        gstin: { type: string, nullable: true }
+        type: { type: string, example: B2B }
+    BuyerAuthToken:
+      type: object
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        token_type: { type: string, example: bearer }
+        buyer: { $ref: '#/components/schemas/Buyer' }
+    OrderCreate:
+      type: object
+      required: [product_id]
+      properties:
+        product_id: { type: string }
+        quantity: { type: integer, default: 1 }
+        note: { type: string, nullable: true }
+    Order:
+      type: object
+      properties:
+        id: { type: string }
+        product_id: { type: string }
+        buyer_id: { type: string }
+        artisan_id: { type: string }
+        quantity: { type: integer }
+        unit_price: { type: number }
+        total_price: { type: number }
+        status: { type: string, enum: [pending, accepted, rejected, paid, shipped, completed, cancelled] }
+        note: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    PaymentCheckout:
+      type: object
+      properties:
+        order_id: { type: string }
+        payment_id: { type: string }
+        provider: { type: string, example: mock }
+        provider_order_id: { type: string }
+        amount: { type: number }
+        currency: { type: string, example: INR }
+        key_id: { type: string, nullable: true }

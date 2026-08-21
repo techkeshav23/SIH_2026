@@ -30,6 +30,11 @@ class HomeScreen extends ConsumerWidget {
         title: Text(T.of(context, lang, 'my_products')),
         actions: [
           IconButton(
+            tooltip: 'Orders',
+            icon: const Icon(Icons.receipt_long_outlined),
+            onPressed: () => context.push('/orders'),
+          ),
+          IconButton(
             tooltip: 'Marketplace',
             icon: const Icon(Icons.storefront_outlined),
             onPressed: () => context.push('/market'),

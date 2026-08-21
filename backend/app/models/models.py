@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, String, Text
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -84,9 +84,46 @@ class Buyer(Base):
     __tablename__ = "buyers"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
-    org_name: Mapped[str] = mapped_column(String)
+    phone: Mapped[str] = mapped_column(String, unique=True, index=True)
+    name: Mapped[str | None] = mapped_column(String, nullable=True)
+    org_name: Mapped[str | None] = mapped_column(String, nullable=True)
     gstin: Mapped[str | None] = mapped_column(String, nullable=True)
     type: Mapped[str] = mapped_column(String, default="B2B")  # GeM|B2B|retail
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class Order(Base):
+    __tablename__ = "orders"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    product_id: Mapped[str] = mapped_column(ForeignKey("products.id"), index=True)
+    buyer_id: Mapped[str] = mapped_column(ForeignKey("buyers.id"), index=True)
+    artisan_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+
+    quantity: Mapped[int] = mapped_column(Integer, default=1)
+    unit_price: Mapped[float] = mapped_column(Float)
+    total_price: Mapped[float] = mapped_column(Float)
+
+    # pending -> accepted/rejected -> paid -> shipped -> completed | cancelled
+    status: Mapped[str] = mapped_column(String, default="pending", index=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+
+class Payment(Base):
+    __tablename__ = "payments"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    order_id: Mapped[str] = mapped_column(ForeignKey("orders.id"), index=True)
+    provider: Mapped[str] = mapped_column(String, default="mock")
+    provider_order_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    provider_payment_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    amount: Mapped[float] = mapped_column(Float)
+    currency: Mapped[str] = mapped_column(String, default="INR")
+    status: Mapped[str] = mapped_column(String, default="created")  # created|paid|failed
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
 
 class Inquiry(Base):

@@ -44,6 +44,11 @@ class Settings(BaseSettings):
 
     pricing_model_path: str = "../ml/pricing_model.pkl"
 
+    # ---- Payments ----
+    payment_provider: str = "mock"   # mock | razorpay
+    razorpay_key_id: str = ""
+    razorpay_key_secret: str = ""
+
     @property
     def is_dev(self) -> bool:
         return self.app_env == "dev"

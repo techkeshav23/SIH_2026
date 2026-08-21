@@ -118,3 +118,35 @@ class Comparable {
         source: j['source'] ?? '',
       );
 }
+
+class Order {
+  final String id;
+  final String productId;
+  final int quantity;
+  final double unitPrice;
+  final double totalPrice;
+  final String status; // pending|accepted|rejected|paid|shipped|completed|cancelled
+  final String? note;
+
+  Order({
+    required this.id,
+    required this.productId,
+    required this.quantity,
+    required this.unitPrice,
+    required this.totalPrice,
+    required this.status,
+    this.note,
+  });
+
+  factory Order.fromJson(Map<String, dynamic> j) => Order(
+        id: j['id'],
+        productId: j['product_id'],
+        quantity: j['quantity'] ?? 1,
+        unitPrice: (j['unit_price'] as num).toDouble(),
+        totalPrice: (j['total_price'] as num).toDouble(),
+        status: j['status'] ?? 'pending',
+        note: j['note'],
+      );
+
+  bool get isPending => status == 'pending';
+}

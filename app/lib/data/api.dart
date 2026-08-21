@@ -167,6 +167,22 @@ class Api {
         data: {'product_id': productId, 'org_name': orgName, 'message': message});
   }
 
+  // ---- orders (artisan side) ----
+  Future<List<Order>> incomingOrders() async {
+    final r = await _dio.get('/orders/incoming');
+    return (r.data as List).map((e) => Order.fromJson(e)).toList();
+  }
+
+  Future<Order> acceptOrder(String id) async {
+    final r = await _dio.post('/orders/$id/accept');
+    return Order.fromJson(r.data);
+  }
+
+  Future<Order> rejectOrder(String id) async {
+    final r = await _dio.post('/orders/$id/reject');
+    return Order.fromJson(r.data);
+  }
+
   // ---- offline draft sync ----
   /// Flush locally-queued drafts to the server (create + generate listing).
   /// Returns number synced.
