@@ -15,7 +15,7 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from PIL import Image  # noqa: E402
 
-from app.core import limiter, otp  # noqa: E402
+from app.core import limiter, otp, quota  # noqa: E402
 from app.main import app  # noqa: E402
 
 
@@ -23,6 +23,7 @@ from app.main import app  # noqa: E402
 def _reset_state():
     otp.clear()
     limiter.reset()
+    quota.reset()
     yield
 
 

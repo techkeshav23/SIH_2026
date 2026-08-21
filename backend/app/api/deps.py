@@ -2,6 +2,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.core import quota
 from app.core.db import get_db
 from app.core.security import decode_token
 from app.models import User
@@ -21,4 +22,14 @@ def get_current_user(
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found")
+    return user
+
+
+def enforce_ai_quota(user: User = Depends(get_current_user)) -> User:
+    """Authenticated user who is still within their daily AI-call budget."""
+    if not quota.hit(user.id):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Daily AI limit reached — try again tomorrow",
+        )
     return user

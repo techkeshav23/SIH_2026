@@ -3,7 +3,7 @@ import mimetypes
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import enforce_ai_quota
 from app.core.db import get_db
 from app.core.limiter import rate_limit
 from app.core.storage import save_temp
@@ -38,7 +38,7 @@ def _audio_mime(file: UploadFile) -> str:
 async def enhance_image(
     product_id: str = Form(...),
     file: UploadFile = File(...),
-    user: User = Depends(get_current_user),
+    user: User = Depends(enforce_ai_quota),
     db: Session = Depends(get_db),
     _: None = Depends(_ai_limit),
 ):
@@ -58,7 +58,7 @@ async def catalog_from_voice(
     product_id: str = Form(...),
     file: UploadFile = File(...),
     source_lang: str = Form("hi"),
-    user: User = Depends(get_current_user),
+    user: User = Depends(enforce_ai_quota),
     db: Session = Depends(get_db),
     _: None = Depends(_ai_limit),
 ):
@@ -77,7 +77,7 @@ async def catalog_from_voice(
 @router.post("/catalog-from-text", response_model=ProductOut)
 def catalog_from_text(
     body: CatalogFromText,
-    user: User = Depends(get_current_user),
+    user: User = Depends(enforce_ai_quota),
     db: Session = Depends(get_db),
     _: None = Depends(_ai_limit),
 ):

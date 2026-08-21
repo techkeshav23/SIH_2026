@@ -8,9 +8,16 @@ When GEMINI_API_KEY is empty (or USE_REAL_AI=false), functional stubs keep the
 whole app working for demos without any key.
 """
 import json
+import logging
+import time
 
 from app.core.config import settings
 from app.models.schemas import CatalogResult
+
+log = logging.getLogger("kalasetu.ai")
+
+_MAX_RETRIES = 3
+_TIMEOUT_MS = 30_000
 
 LLM_SYSTEM_PROMPT = (
     "You are an expert e-commerce copywriter for Indian handmade crafts. "
@@ -26,26 +33,50 @@ LLM_SYSTEM_PROMPT = (
 
 def _client():
     from google import genai
+    from google.genai import types
 
-    return genai.Client(api_key=settings.gemini_api_key)
+    return genai.Client(
+        api_key=settings.gemini_api_key,
+        http_options=types.HttpOptions(timeout=_TIMEOUT_MS),
+    )
 
 
 def _gemini_enabled() -> bool:
     return settings.use_real_ai and bool(settings.gemini_api_key)
 
 
-# ---------- public API ----------
+def _with_retry(fn, what: str):
+    """Call fn with exponential backoff; raise the last error if all fail."""
+    last = None
+    for attempt in range(_MAX_RETRIES):
+        try:
+            return fn()
+        except Exception as e:  # noqa: BLE001
+            last = e
+            log.warning("Gemini %s attempt %d/%d failed: %s", what, attempt + 1, _MAX_RETRIES, e)
+            if attempt < _MAX_RETRIES - 1:
+                time.sleep(0.5 * (2**attempt))
+    raise last
+
+
+# ---------- public API (never raises: degrades to stub) ----------
 def catalog_from_audio(audio_bytes: bytes, mime_type: str, source_lang: str = "hi") -> CatalogResult:
-    """Voice note -> full listing (single Gemini call)."""
+    """Voice note -> full listing. Falls back to a stub if Gemini is unavailable."""
     if _gemini_enabled():
-        return _gemini_audio(audio_bytes, mime_type, source_lang)
+        try:
+            return _with_retry(lambda: _gemini_audio(audio_bytes, mime_type, source_lang), "audio")
+        except Exception:  # noqa: BLE001
+            log.error("Gemini audio failed after retries — using stub")
     return _generate_stub("(voice note)", "", "")
 
 
 def generate_listing(description_en: str, category: str = "", material: str = "") -> CatalogResult:
-    """Typed rough text -> full listing."""
+    """Typed rough text -> full listing. Falls back to a stub on failure."""
     if _gemini_enabled():
-        return _gemini_text(description_en, category, material)
+        try:
+            return _with_retry(lambda: _gemini_text(description_en, category, material), "text")
+        except Exception:  # noqa: BLE001
+            log.error("Gemini text failed after retries — using stub")
     return _generate_stub(description_en, category, material)
 
 

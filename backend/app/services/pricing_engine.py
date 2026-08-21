@@ -38,6 +38,22 @@ def _load_model():
     return _model
 
 
+def _predict_base(model, category: str, material: str) -> float:
+    """Use the trained model; fall back to the comparables table on any error."""
+    try:
+        import pandas as pd
+
+        row = pd.DataFrame([{
+            "category": category.lower().strip(),
+            "material": material.lower().strip(),
+            "size": "medium",
+            "region": "",
+        }])
+        return float(model.predict(row)[0])
+    except Exception:  # noqa: BLE001
+        return _base_price(category, material)
+
+
 def _base_price(category: str, material: str) -> float:
     key = (category.lower().strip(), material.lower().strip())
     if key in _BASE_PRICES:
@@ -59,12 +75,7 @@ def suggest(
     material = material or "mixed"
 
     model = _load_model()
-    if model is not None:
-        # TODO(ml): featurize (category, material, dims) and predict
-        # base = float(model.predict([[...]])[0])
-        base = _base_price(category, material)
-    else:
-        base = _base_price(category, material)
+    base = _predict_base(model, category, material) if model is not None else _base_price(category, material)
 
     # honest floor: never suggest below material cost + fair labour margin
     if material_cost:
