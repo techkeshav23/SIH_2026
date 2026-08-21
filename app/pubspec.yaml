@@ -1,0 +1,35 @@
+name: kalasetu
+description: "AI Market Linkage & Smart Cataloging for Artisans (SIH 26090)."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # state + routing
+  flutter_riverpod: ^2.6.1
+  go_router: ^14.6.2
+
+  # networking
+  dio: ^5.7.0
+
+  # media capture
+  image_picker: ^1.1.2
+  record: ^5.2.0
+
+  # local storage (offline drafts)
+  shared_preferences: ^2.3.3
+  path_provider: ^2.1.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

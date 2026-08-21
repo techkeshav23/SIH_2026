@@ -1,0 +1,36 @@
+# Python / backend
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.env
+.env.*
+!.env.example
+
+# Flutter / Dart
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/build/
+app/.idea/
+app/android/.gradle/
+app/android/app/debug/
+app/ios/Pods/
+*.iml
+
+# ML
+ml/*.pkl
+ml/.ipynb_checkpoints/
+ml/__pycache__/
+
+# Editors / OS
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Secrets / uploads
+uploads/
+*.local

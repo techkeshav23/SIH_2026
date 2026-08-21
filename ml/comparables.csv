@@ -1,0 +1,16 @@
+category,material,size,region,price
+saree,silk,6m,varanasi,2600
+saree,silk,6m,kanchipuram,3200
+saree,cotton,6m,west-bengal,850
+saree,cotton,6m,odisha,1100
+shawl,wool,2m,kashmir,2400
+shawl,wool,2m,himachal,1500
+pottery,clay,medium,rajasthan,400
+pottery,clay,large,gujarat,650
+painting,canvas,a3,odisha,1900
+painting,canvas,a2,rajasthan,2800
+jewellery,brass,small,west-bengal,600
+jewellery,silver,small,rajasthan,1800
+bag,jute,medium,west-bengal,500
+rug,wool,large,kashmir,3400
+rug,cotton,medium,rajasthan,1400
