@@ -45,11 +45,13 @@ class Demo {
   /// Seeded orders belong to OTHER buyers (artisan's incoming). The demo buyer's
   /// own "My Orders" starts empty and fills as they place orders (buyer_id 'me').
   static final List<Map<String, dynamic>> orders = [
-    _o('o1', 'd1', 'Banarasi Silk Saree', 'saree', 4, 2800, 'paid', 'demo-buyer'),
+    // buyer's OWN orders ('me') — populate the buyer's "My Orders" + show Pay-now
+    _o('o1', 'd1', 'Banarasi Silk Saree', 'saree', 4, 2800, 'paid', 'me'),
+    _o('o4', 'd2', 'Blue Pottery Vase', 'pottery', 8, 750, 'accepted', 'me'),
+    _o('o5', 'd4', 'Pattachitra Painting', 'painting', 3, 2200, 'pending', 'me'),
+    // other buyers — artisan's incoming queue
     _o('o2', 'd3', 'Pashmina Shawl', 'shawl', 6, 5200, 'paid', 'demo-buyer'),
     _o('o3', 'd5', 'Silver Filigree Earrings', 'jewellery', 10, 1600, 'paid', 'demo-buyer'),
-    _o('o4', 'd2', 'Blue Pottery Vase', 'pottery', 8, 750, 'accepted', 'demo-buyer'),
-    _o('o5', 'd4', 'Pattachitra Painting', 'painting', 3, 2200, 'pending', 'demo-buyer'),
     _o('o6', 'd8', 'Handwoven Wool Scarf', 'scarf', 12, 950, 'pending', 'demo-buyer'),
   ];
 
