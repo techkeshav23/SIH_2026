@@ -37,3 +37,6 @@ Thumbs.db
 # Secrets / uploads
 uploads/
 *.local
+
+# build logs
+app/*.log
