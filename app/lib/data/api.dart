@@ -371,5 +371,6 @@ class Api {
     return getProduct(id);
   }
 
-  String mediaUrl(String path) => path.startsWith('http') ? path : '$kBaseUrl$path';
+  String mediaUrl(String path) =>
+      (path.startsWith('http') || path.startsWith('asset:')) ? path : '$kBaseUrl$path';
 }

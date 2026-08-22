@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Lightweight i18n — Hindi/English. Default Hindi (primary audience).
+/// Lightweight i18n — Hindi/English. Default English (toggle to Hindi in-app).
 enum AppLang { hi, en }
 
-final langProvider = StateProvider<AppLang>((ref) => AppLang.hi);
+final langProvider = StateProvider<AppLang>((ref) => AppLang.en);
 
 /// Global text scale (accessibility / large-text mode). 1.0 = default.
 final textScaleProvider = StateProvider<double>((ref) => 1.0);
