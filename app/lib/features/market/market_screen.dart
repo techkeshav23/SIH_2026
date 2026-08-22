@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/nav.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/api.dart';
@@ -17,12 +18,14 @@ class MarketScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final feed = ref.watch(feedProvider);
-    return Scaffold(
+    return AppScaffold(
+      current: 3,
       body: Column(
         children: [
           KHeader(
             title: 'B2B Marketplace',
             subtitle: 'Powered by ONDC · GeM ready',
+            leading: drawerButton(),
             trailing: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
               decoration: BoxDecoration(

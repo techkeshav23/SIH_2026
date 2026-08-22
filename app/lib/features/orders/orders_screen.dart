@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/nav.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/api.dart';
@@ -17,12 +18,14 @@ class OrdersScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final orders = ref.watch(incomingOrdersProvider);
-    return Scaffold(
+    return AppScaffold(
+      current: 1,
       body: Column(
         children: [
-          const KHeader(
+          KHeader(
             title: 'Incoming Orders',
             subtitle: 'Review and respond to buyer requests',
+            leading: drawerButton(),
           ),
           Expanded(
             child: orders.when(

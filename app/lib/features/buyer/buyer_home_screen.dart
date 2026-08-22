@@ -2,10 +2,75 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/l10n.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/api.dart';
 import '../../data/models.dart';
+
+/// Sidebar for the buyer app — brand, language, logout.
+class _BuyerDrawer extends ConsumerWidget {
+  const _BuyerDrawer();
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hi = ref.watch(langProvider) == AppLang.hi;
+    final api = ref.read(apiProvider);
+    return Drawer(
+      backgroundColor: AppColors.surface,
+      child: SafeArea(
+        bottom: false,
+        child: Column(children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 26, 20, 22),
+            decoration: const BoxDecoration(gradient: Decor.heroGradient),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(
+                width: 56, height: 56, padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+                child: Image.asset('assets/icon/logo.png', fit: BoxFit.contain),
+              ),
+              const SizedBox(height: 14),
+              const Text('KalaSetu',
+                  style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
+              const SizedBox(height: 2),
+              Text(api.demoMode ? (hi ? 'डेमो · खरीदार' : 'Demo · Buyer') : (hi ? 'खरीदार खाता' : 'Buyer account'),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13)),
+            ]),
+          ),
+          const SizedBox(height: 8),
+          ListTile(
+            leading: const Icon(Icons.translate_rounded, color: AppColors.textSoft),
+            title: Text(hi ? 'भाषा: हिंदी' : 'Language: English',
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+            onTap: () => ref.read(langProvider.notifier).state = hi ? AppLang.en : AppLang.hi,
+          ),
+          const Spacer(),
+          ListTile(
+            leading: const Icon(Icons.logout_rounded, color: AppColors.danger),
+            title: Text(hi ? 'लॉग आउट' : 'Logout',
+                style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w600)),
+            onTap: () async {
+              Navigator.pop(context);
+              final ok = await confirmDialog(context,
+                  title: hi ? 'लॉग आउट करें?' : 'Logout?',
+                  message: hi ? 'KalaSetu से साइन आउट करें?' : 'Sign out of KalaSetu?',
+                  confirm: hi ? 'लॉग आउट' : 'Logout', danger: true);
+              if (!ok || !context.mounted) return;
+              await api.logout();
+              if (context.mounted) context.go('/login');
+            },
+          ),
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text('SIH 2026 · PS 26090',
+                style: TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.4)),
+          ),
+        ]),
+      ),
+    );
+  }
+}
 
 final buyerFeedProvider = FutureProvider.autoDispose<List<Product>>((ref) async {
   return ref.read(apiProvider).buyerFeed();
@@ -28,21 +93,9 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: const _BuyerDrawer(),
       appBar: AppBar(
         title: Text(_tab == 0 ? 'Marketplace' : 'My Orders'),
-        actions: [
-          IconButton(
-            tooltip: 'Logout',
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              final ok = await confirmDialog(context,
-                  title: 'Logout', message: 'Sign out of KalaSetu?', confirm: 'Logout', danger: true);
-              if (!ok || !context.mounted) return;
-              await ref.read(apiProvider).logout();
-              if (context.mounted) context.go('/login');
-            },
-          ),
-        ],
       ),
       body: _tab == 0 ? const _BrowseTab() : const _MyOrdersTab(),
       bottomNavigationBar: NavigationBar(

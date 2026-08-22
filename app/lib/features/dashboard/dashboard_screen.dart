@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/nav.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/api.dart';
@@ -16,7 +17,8 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final stats = ref.watch(statsProvider);
-    return Scaffold(
+    return AppScaffold(
+      current: 2,
       body: stats.when(
         loading: () => const KLoading(),
         error: (e, _) => KErrorState(
@@ -30,6 +32,7 @@ class DashboardScreen extends ConsumerWidget {
             children: [
               KHeader(
                 title: 'Dashboard',
+                leading: drawerButton(),
                 trailing: _EarningsHero(earnings: s.earnings, paid: s.ordersPaid),
               ),
               Padding(

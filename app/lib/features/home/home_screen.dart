@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/l10n.dart';
+import '../../core/nav.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/api.dart';
@@ -26,8 +27,9 @@ class HomeScreen extends ConsumerWidget {
     final products = ref.watch(productsProvider);
     final pending = ref.watch(pendingProvider).valueOrNull ?? 0;
 
-    return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
+    return AppScaffold(
+      current: 0,
+      fab: FloatingActionButton.extended(
         onPressed: () async {
           await context.push('/create');
           ref.invalidate(productsProvider);
@@ -44,21 +46,10 @@ class HomeScreen extends ConsumerWidget {
           KHeader(
             title: T.of(context, lang, 'my_products'),
             subtitle: T.of(context, lang, 'tagline'),
-            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-              _HeaderIcon(icon: Icons.dashboard_rounded, tooltip: 'Dashboard', onTap: () => context.push('/dashboard')),
-              _HeaderIcon(icon: Icons.receipt_long_rounded, tooltip: 'Orders', onTap: () => context.push('/orders')),
-              _HeaderIcon(icon: Icons.storefront_rounded, tooltip: 'Market', onTap: () => context.push('/market')),
-              _HeaderIcon(
+            leading: drawerButton(),
+            trailing: _HeaderIcon(
                 icon: Icons.translate_rounded, tooltip: 'Language',
                 onTap: () => ref.read(langProvider.notifier).state = lang == AppLang.hi ? AppLang.en : AppLang.hi),
-              _HeaderIcon(icon: Icons.logout_rounded, tooltip: 'Logout', onTap: () async {
-                final ok = await confirmDialog(context,
-                    title: 'Logout', message: 'Sign out of KalaSetu?', confirm: 'Logout', danger: true);
-                if (!ok || !context.mounted) return;
-                await ref.read(apiProvider).logout();
-                if (context.mounted) context.go('/login');
-              }),
-            ]),
           ),
           if (pending > 0)
             _PendingBanner(count: pending, onSync: () async {
