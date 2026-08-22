@@ -22,6 +22,20 @@ class Demo {
     _o('o3', 'd4', 1, 2200, 'paid'),
   ];
 
+  static final Map<String, dynamic> profile = {
+    'id': 'demo',
+    'phone': '+91 90000 00000',
+    'name': 'कमला देवी',
+    'language_pref': 'hi',
+    'craft_type': 'हथकरघा बुनाई',
+    'region': 'वाराणसी, उत्तर प्रदेश',
+  };
+
+  static Map<String, dynamic> updateProfile(Map<String, dynamic> patch) {
+    profile.addAll(patch);
+    return profile;
+  }
+
   static Map<String, dynamic> stats() {
     final paid = orders.where((o) => o['status'] == 'paid').toList();
     return {

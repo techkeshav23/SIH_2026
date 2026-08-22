@@ -137,6 +137,19 @@ class Api {
     await _saveTokens(r.data['access_token'], r.data['refresh_token'], 'buyer');
   }
 
+  // ---- profile (artisan) ----
+  Future<UserModel> getMe() async {
+    if (demoMode) return UserModel.fromJson(Demo.profile);
+    final r = await _dio.get('/me');
+    return UserModel.fromJson(r.data);
+  }
+
+  Future<UserModel> updateMe(Map<String, dynamic> patch) async {
+    if (demoMode) return UserModel.fromJson(Demo.updateProfile(patch));
+    final r = await _dio.patch('/me', data: patch);
+    return UserModel.fromJson(r.data);
+  }
+
   // ---- products ----
   /// Online: fetch + cache. Offline: return cached list (best-effort).
   Future<List<Product>> listProducts() async {

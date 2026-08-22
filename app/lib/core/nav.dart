@@ -105,6 +105,16 @@ class AppDrawer extends ConsumerWidget {
               ),
             const Divider(height: 24, indent: 16, endIndent: 16),
             _DrawerItem(
+              icon: Icons.person_rounded,
+              label: hi ? 'दुकान प्रोफ़ाइल' : 'Shop Profile',
+              onTap: () { Navigator.pop(context); context.push('/profile'); },
+            ),
+            _DrawerItem(
+              icon: Icons.settings_rounded,
+              label: hi ? 'सेटिंग्स' : 'Settings',
+              onTap: () { Navigator.pop(context); context.push('/settings'); },
+            ),
+            _DrawerItem(
               icon: Icons.translate_rounded,
               label: hi ? 'भाषा: हिंदी' : 'Language: English',
               onTap: () => ref.read(langProvider.notifier).state = hi ? AppLang.en : AppLang.hi,

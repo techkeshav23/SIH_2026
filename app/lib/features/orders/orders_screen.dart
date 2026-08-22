@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/nav.dart';
 import '../../core/theme.dart';
@@ -80,6 +81,7 @@ class _OrderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final api = ref.read(apiProvider);
     return KCard(
+      onTap: () => context.push('/order-detail', extra: order),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

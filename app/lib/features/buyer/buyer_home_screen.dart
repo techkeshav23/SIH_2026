@@ -45,6 +45,11 @@ class _BuyerDrawer extends ConsumerWidget {
                 style: const TextStyle(fontWeight: FontWeight.w600)),
             onTap: () => ref.read(langProvider.notifier).state = hi ? AppLang.en : AppLang.hi,
           ),
+          ListTile(
+            leading: const Icon(Icons.settings_rounded, color: AppColors.textSoft),
+            title: Text(hi ? 'सेटिंग्स' : 'Settings', style: const TextStyle(fontWeight: FontWeight.w600)),
+            onTap: () { Navigator.pop(context); context.push('/settings'); },
+          ),
           const Spacer(),
           ListTile(
             leading: const Icon(Icons.logout_rounded, color: AppColors.danger),
@@ -79,6 +84,32 @@ final buyerFeedProvider = FutureProvider.autoDispose<List<Product>>((ref) async 
 final myOrdersProvider = FutureProvider.autoDispose<List<Order>>((ref) async {
   return ref.read(apiProvider).myOrders();
 });
+
+final buyerSearchProvider = StateProvider<String>((ref) => '');
+final buyerCategoryProvider = StateProvider<String?>((ref) => null);
+
+class _CatChip extends StatelessWidget {
+  const _CatChip({required this.label, required this.selected, required this.onTap});
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: ChoiceChip(
+          label: Text(label),
+          selected: selected,
+          onSelected: (_) => onTap(),
+          showCheckmark: false,
+          selectedColor: AppColors.primary,
+          labelStyle: TextStyle(
+              color: selected ? Colors.white : AppColors.textSoft,
+              fontWeight: FontWeight.w600, fontSize: 13),
+          backgroundColor: AppColors.surface,
+          side: BorderSide(color: selected ? AppColors.primary : AppColors.line),
+        ),
+      );
+}
 
 /// Buyer app shell: browse the marketplace and track orders.
 class BuyerHomeScreen extends ConsumerStatefulWidget {
@@ -117,32 +148,75 @@ class _BrowseTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final feed = ref.watch(buyerFeedProvider);
     final api = ref.read(apiProvider);
+    final lang = ref.watch(langProvider);
+    final q = ref.watch(buyerSearchProvider).toLowerCase();
+    final cat = ref.watch(buyerCategoryProvider);
+
     return feed.when(
       loading: () => const KLoading(),
       error: (e, _) => KErrorState(
-        message: 'Could not load marketplace',
+        message: T.of(context, lang, 'could_not_load'),
         onRetry: () => ref.invalidate(buyerFeedProvider),
       ),
-      data: (items) => items.isEmpty
-          ? const KEmpty(
-              icon: Icons.storefront_outlined,
-              title: 'No products yet',
-              subtitle: 'New handmade pieces will appear here soon.',
-            )
-          : RefreshIndicator(
-              color: AppColors.primary,
-              onRefresh: () async => ref.invalidate(buyerFeedProvider),
-              child: GridView.builder(
-                padding: const EdgeInsets.all(16),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2, childAspectRatio: 0.62, crossAxisSpacing: 14, mainAxisSpacing: 14),
-                itemCount: items.length,
-                itemBuilder: (_, i) => _ProductTile(
-                  product: items[i], api: api,
-                  onOrder: () => _openOrderSheet(context, ref, items[i]),
-                ),
+      data: (all) {
+        final cats = <String>{for (final p in all) if (p.category != null) p.category!}.toList()..sort();
+        final items = all.where((p) {
+          final okCat = cat == null || p.category == cat;
+          final hay = '${p.titleEn ?? ''} ${p.titleHi ?? ''} ${p.category ?? ''} ${p.tags.join(' ')}'.toLowerCase();
+          return okCat && (q.isEmpty || hay.contains(q));
+        }).toList();
+
+        return Column(children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: TextField(
+              onChanged: (v) => ref.read(buyerSearchProvider.notifier).state = v,
+              decoration: InputDecoration(
+                hintText: T.of(context, lang, 'search'),
+                prefixIcon: const Icon(Icons.search_rounded),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
               ),
             ),
+          ),
+          if (cats.isNotEmpty)
+            SizedBox(
+              height: 46,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                children: [
+                  _CatChip(label: T.of(context, lang, 'all'), selected: cat == null,
+                      onTap: () => ref.read(buyerCategoryProvider.notifier).state = null),
+                  for (final c in cats)
+                    _CatChip(label: c, selected: cat == c,
+                        onTap: () => ref.read(buyerCategoryProvider.notifier).state = c),
+                ],
+              ),
+            ),
+          Expanded(
+            child: items.isEmpty
+                ? KEmpty(
+                    icon: Icons.search_off_rounded,
+                    title: T.of(context, lang, 'no_listed'),
+                  )
+                : RefreshIndicator(
+                    color: AppColors.primary,
+                    onRefresh: () async => ref.invalidate(buyerFeedProvider),
+                    child: GridView.builder(
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2, childAspectRatio: 0.62, crossAxisSpacing: 14, mainAxisSpacing: 14),
+                      itemCount: items.length,
+                      itemBuilder: (ctx, i) => _ProductTile(
+                        product: items[i], api: api,
+                        onOrder: () => _openOrderSheet(context, ref, items[i]),
+                        onTap: () => ctx.push('/buyer/product', extra: items[i]),
+                      ),
+                    ),
+                  ),
+          ),
+        ]);
+      },
     );
   }
 
@@ -156,10 +230,11 @@ class _BrowseTab extends ConsumerWidget {
 }
 
 class _ProductTile extends StatelessWidget {
-  const _ProductTile({required this.product, required this.api, required this.onOrder});
+  const _ProductTile({required this.product, required this.api, required this.onOrder, required this.onTap});
   final Product product;
   final Api api;
   final VoidCallback onOrder;
+  final VoidCallback onTap;
   @override
   Widget build(BuildContext context) {
     final img = product.enhancedImageUrl ?? product.rawImageUrl;
@@ -176,10 +251,13 @@ class _ProductTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: KNetImage(
-              img != null ? api.mediaUrl(img) : null,
-              width: double.infinity,
-              radius: 0,
+            child: GestureDetector(
+              onTap: onTap,
+              child: KNetImage(
+                img != null ? api.mediaUrl(img) : null,
+                width: double.infinity,
+                radius: 0,
+              ),
             ),
           ),
           Padding(
@@ -404,6 +482,7 @@ class _BuyerOrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return KCard(
+      onTap: () => context.push('/order-detail', extra: order),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
