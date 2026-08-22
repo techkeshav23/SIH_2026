@@ -7,7 +7,36 @@ import '../../core/theme.dart';
 import '../../core/tts.dart';
 import '../../core/widgets.dart';
 import '../../data/api.dart';
+import '../../data/cart.dart';
 import '../../data/models.dart';
+import '../notifications/notifications_screen.dart';
+
+/// App-bar icon with a small count badge (cart / notifications).
+class KBadgeIcon extends StatelessWidget {
+  const KBadgeIcon({super.key, required this.icon, required this.count, required this.onTap});
+  final IconData icon;
+  final int count;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => Stack(
+        alignment: Alignment.center,
+        children: [
+          IconButton(icon: Icon(icon), onPressed: onTap),
+          if (count > 0)
+            Positioned(
+              right: 6, top: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(color: AppColors.danger, borderRadius: BorderRadius.circular(10)),
+                constraints: const BoxConstraints(minWidth: 17),
+                child: Text('${count > 99 ? '99+' : count}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+              ),
+            ),
+        ],
+      );
+}
 
 /// Sidebar for the buyer app — brand, language, logout.
 class _BuyerDrawer extends ConsumerWidget {
@@ -130,7 +159,19 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
       drawer: const _BuyerDrawer(),
       appBar: AppBar(
         title: Text(title),
-        actions: [KSpeak(title)],
+        actions: [
+          KBadgeIcon(
+            icon: Icons.notifications_none_rounded,
+            count: ref.watch(unreadProvider).valueOrNull ?? 0,
+            onTap: () => context.push('/notifications'),
+          ),
+          KBadgeIcon(
+            icon: Icons.shopping_cart_outlined,
+            count: ref.watch(cartCountProvider),
+            onTap: () => context.push('/cart'),
+          ),
+          KSpeak(title),
+        ],
       ),
       body: _tab == 0 ? const _BrowseTab() : const _MyOrdersTab(),
       bottomNavigationBar: NavigationBar(

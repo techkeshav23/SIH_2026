@@ -241,6 +241,53 @@ class Api {
         data: {'product_id': productId, 'org_name': orgName, 'message': message});
   }
 
+  // ---- reviews ----
+  Future<List<Review>> getReviews(String productId) async {
+    if (demoMode) return Demo.reviewsFor(productId).map((e) => Review.fromJson(e)).toList();
+    try {
+      final r = await _dio.get('/products/$productId/reviews');
+      return (r.data as List).map((e) => Review.fromJson(e)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> addReview(String productId, int rating, String text) async {
+    if (demoMode) {
+      Demo.addReview(productId, rating, text);
+      return;
+    }
+    try {
+      await _dio.post('/products/$productId/reviews', data: {'rating': rating, 'text': text});
+    } catch (_) {}
+  }
+
+  // ---- notifications ----
+  Future<List<AppNotification>> getNotifications() async {
+    if (demoMode) return Demo.notifications.map((e) => AppNotification.fromJson(e)).toList();
+    try {
+      final r = await _dio.get('/notifications');
+      return (r.data as List).map((e) => AppNotification.fromJson(e)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<int> unreadNotifications() async {
+    if (demoMode) return Demo.unreadCount();
+    return 0;
+  }
+
+  Future<void> markNotificationsRead() async {
+    if (demoMode) {
+      Demo.markAllRead();
+      return;
+    }
+    try {
+      await _dio.post('/notifications/read');
+    } catch (_) {}
+  }
+
   // ---- dashboard (artisan) ----
   Future<ArtisanStats> artisanStats() async {
     if (demoMode) return ArtisanStats.fromJson(Demo.stats());

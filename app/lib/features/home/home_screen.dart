@@ -9,6 +9,7 @@ import '../../core/widgets.dart';
 import '../../data/api.dart';
 import '../../data/local_store.dart';
 import '../../data/models.dart';
+import '../notifications/notifications_screen.dart';
 
 final productsProvider = FutureProvider.autoDispose<List<Product>>((ref) async {
   return ref.read(apiProvider).listProducts();
@@ -47,9 +48,19 @@ class HomeScreen extends ConsumerWidget {
             title: T.of(context, lang, 'my_products'),
             subtitle: T.of(context, lang, 'tagline'),
             leading: drawerButton(),
-            trailing: _HeaderIcon(
-                icon: Icons.translate_rounded, tooltip: 'Language',
-                onTap: () => ref.read(langProvider.notifier).state = lang == AppLang.hi ? AppLang.en : AppLang.hi),
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              Stack(alignment: Alignment.center, children: [
+                _HeaderIcon(icon: Icons.notifications_none_rounded, tooltip: 'Notifications',
+                    onTap: () => context.push('/notifications')),
+                if ((ref.watch(unreadProvider).valueOrNull ?? 0) > 0)
+                  Positioned(right: 6, top: 8, child: Container(width: 9, height: 9,
+                      decoration: BoxDecoration(color: AppColors.accent, shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1.5)))),
+              ]),
+              _HeaderIcon(
+                  icon: Icons.translate_rounded, tooltip: 'Language',
+                  onTap: () => ref.read(langProvider.notifier).state = lang == AppLang.hi ? AppLang.en : AppLang.hi),
+            ]),
           ),
           if (pending > 0)
             _PendingBanner(count: pending, onSync: () async {

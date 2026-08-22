@@ -5,7 +5,9 @@ import '../data/models.dart';
 import '../features/auth/login_screen.dart';
 import '../features/buyer/buyer_home_screen.dart';
 import '../features/buyer/buyer_product_screen.dart';
+import '../features/buyer/cart_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
+import '../features/notifications/notifications_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/market/market_screen.dart';
 import '../features/orders/order_detail_screen.dart';
@@ -28,6 +30,8 @@ GoRouter buildRouter(Api api) {
       GoRoute(path: '/dashboard', builder: (c, s) => const DashboardScreen()),
       GoRoute(path: '/profile', builder: (c, s) => const ProfileScreen()),
       GoRoute(path: '/settings', builder: (c, s) => const SettingsScreen()),
+      GoRoute(path: '/cart', builder: (c, s) => const CartScreen()),
+      GoRoute(path: '/notifications', builder: (c, s) => const NotificationsScreen()),
       GoRoute(path: '/buyer/home', builder: (c, s) => const BuyerHomeScreen()),
       GoRoute(
         path: '/buyer/product',

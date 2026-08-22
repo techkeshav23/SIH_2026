@@ -7,7 +7,13 @@ import '../../core/theme.dart';
 import '../../core/tts.dart';
 import '../../core/widgets.dart';
 import '../../data/api.dart';
+import '../../data/cart.dart';
 import '../../data/models.dart';
+
+final reviewsProvider =
+    FutureProvider.autoDispose.family<List<Review>, String>((ref, id) async {
+  return ref.read(apiProvider).getReviews(id);
+});
 
 /// Buyer-facing product detail page. Product passed via route extra.
 class BuyerProductScreen extends ConsumerWidget {
@@ -33,17 +39,25 @@ class BuyerProductScreen extends ConsumerWidget {
           border: Border(top: BorderSide(color: AppColors.line)),
         ),
         child: Row(children: [
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-              Text(t('total'), style: Theme.of(context).textTheme.labelSmall),
-              Text(price != null ? '₹${price.toStringAsFixed(0)}' : '—',
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 22, color: AppColors.success)),
-            ]),
+          IconButton.outlined(
+            onPressed: () {
+              ref.read(cartProvider.notifier).add(product);
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t('added_to_cart'))));
+            },
+            icon: const Icon(Icons.add_shopping_cart_rounded),
+            style: IconButton.styleFrom(
+              minimumSize: const Size(54, 54),
+              side: const BorderSide(color: AppColors.line),
+              foregroundColor: AppColors.primary,
+            ),
           ),
-          FilledButton.icon(
-            onPressed: () => _order(context, ref, api, price ?? 0),
-            icon: const Icon(Icons.shopping_bag_rounded),
-            label: Text(t('order')),
+          const SizedBox(width: 12),
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: () => _order(context, ref, api, price ?? 0),
+              icon: const Icon(Icons.shopping_bag_rounded),
+              label: Text('${t('order')}  ·  ₹${(price ?? 0).toStringAsFixed(0)}'),
+            ),
           ),
         ]),
       ),
@@ -79,6 +93,8 @@ class BuyerProductScreen extends ConsumerWidget {
                   for (final tag in product.tags) Chip(label: Text('#$tag')),
                 ]),
               ],
+              Gap.l,
+              _Reviews(productId: product.id),
               Gap.xl,
             ]),
           ),
@@ -138,4 +154,118 @@ class BuyerProductScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _Reviews extends ConsumerWidget {
+  const _Reviews({required this.productId});
+  final String productId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lang = ref.watch(langProvider);
+    final reviews = ref.watch(reviewsProvider(productId));
+    String t(String k) => T.of(context, lang, k);
+
+    return reviews.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (list) {
+        final avg = list.isEmpty ? 0.0 : list.map((r) => r.rating).reduce((a, b) => a + b) / list.length;
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Expanded(child: KSectionTitle('${t('reviews')} (${list.length})')),
+            if (list.isNotEmpty) ...[
+              _Stars(avg),
+              const SizedBox(width: 6),
+              Text(avg.toStringAsFixed(1), style: const TextStyle(fontWeight: FontWeight.w800)),
+            ],
+          ]),
+          Gap.s,
+          if (list.isEmpty)
+            Text(t('no_reviews'), style: Theme.of(context).textTheme.bodyMedium)
+          else
+            for (final r in list)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    _Stars(r.rating.toDouble(), size: 15),
+                    const SizedBox(width: 8),
+                    Text(r.author, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    const Spacer(),
+                    if (r.date != null) Text(r.date!, style: Theme.of(context).textTheme.labelSmall),
+                  ]),
+                  const SizedBox(height: 3),
+                  Text(r.text, style: Theme.of(context).textTheme.bodyMedium),
+                ]),
+              ),
+          Gap.s,
+          OutlinedButton.icon(
+            onPressed: () => _write(context, ref),
+            icon: const Icon(Icons.rate_review_outlined),
+            label: Text(t('write_review')),
+          ),
+        ]);
+      },
+    );
+  }
+
+  void _write(BuildContext context, WidgetRef ref) {
+    int rating = 5;
+    final ctrl = TextEditingController();
+    final lang = ref.read(langProvider);
+    String t(String k) => T.of(context, lang, k);
+    showDialog(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (c, setD) => AlertDialog(
+          title: Text(t('write_review')),
+          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(t('your_rating'), style: Theme.of(c).textTheme.labelSmall),
+            const SizedBox(height: 4),
+            Row(children: [
+              for (int i = 1; i <= 5; i++)
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => setD(() => rating = i),
+                  icon: Icon(i <= rating ? Icons.star_rounded : Icons.star_outline_rounded,
+                      color: AppColors.accent, size: 30),
+                ),
+            ]),
+            TextField(controller: ctrl, maxLines: 3, decoration: const InputDecoration(border: OutlineInputBorder())),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c), child: Text(t('cancel'))),
+            FilledButton(
+              onPressed: () async {
+                await ref.read(apiProvider).addReview(productId, rating, ctrl.text.trim());
+                ref.invalidate(reviewsProvider(productId));
+                if (c.mounted) Navigator.pop(c);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t('review_thanks'))));
+                }
+              },
+              child: Text(t('submit')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Stars extends StatelessWidget {
+  const _Stars(this.value, {this.size = 18});
+  final double value;
+  final double size;
+  @override
+  Widget build(BuildContext context) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (int i = 1; i <= 5; i++)
+            Icon(
+              value >= i ? Icons.star_rounded : (value >= i - 0.5 ? Icons.star_half_rounded : Icons.star_outline_rounded),
+              color: AppColors.accent, size: size),
+        ],
+      );
 }

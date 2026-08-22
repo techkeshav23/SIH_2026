@@ -40,11 +40,36 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
     }
   }
 
+  Future<ImageSource?> _pickSource() {
+    final lang = ref.read(langProvider);
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (c) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const SizedBox(height: 8),
+          ListTile(
+            leading: const Icon(Icons.photo_camera_rounded, color: AppColors.primary),
+            title: Text(T.of(context, lang, 'camera')),
+            onTap: () => Navigator.pop(c, ImageSource.camera),
+          ),
+          ListTile(
+            leading: const Icon(Icons.photo_library_rounded, color: AppColors.primary),
+            title: Text(T.of(context, lang, 'gallery')),
+            onTap: () => Navigator.pop(c, ImageSource.gallery),
+          ),
+          const SizedBox(height: 8),
+        ]),
+      ),
+    );
+  }
+
   Future<void> _takePhoto() async {
     final lang = ref.read(langProvider);
     String path = '';
     if (!_api.demoMode) {
-      final file = await _picker.pickImage(source: ImageSource.camera, imageQuality: 90);
+      final source = await _pickSource();
+      if (source == null) return;
+      final file = await _picker.pickImage(source: source, imageQuality: 90);
       if (file == null) return;
       path = file.path;
     }

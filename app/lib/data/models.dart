@@ -158,6 +158,48 @@ class Order {
   bool get isAccepted => status == 'accepted';
 }
 
+class Review {
+  final String id;
+  final String productId;
+  final String author;
+  final int rating; // 1..5
+  final String text;
+  final String? date;
+
+  Review({required this.id, required this.productId, required this.author,
+      required this.rating, required this.text, this.date});
+
+  factory Review.fromJson(Map<String, dynamic> j) => Review(
+        id: j['id'],
+        productId: j['product_id'] ?? '',
+        author: j['author'] ?? 'Buyer',
+        rating: (j['rating'] as num?)?.toInt() ?? 5,
+        text: j['text'] ?? '',
+        date: j['date'],
+      );
+}
+
+class AppNotification {
+  final String id;
+  final String title;
+  final String body;
+  final String type; // order|payment|inquiry|system
+  final bool read;
+  final String? time;
+
+  AppNotification({required this.id, required this.title, required this.body,
+      required this.type, this.read = false, this.time});
+
+  factory AppNotification.fromJson(Map<String, dynamic> j) => AppNotification(
+        id: j['id'],
+        title: j['title'] ?? '',
+        body: j['body'] ?? '',
+        type: j['type'] ?? 'system',
+        read: j['read'] ?? false,
+        time: j['time'],
+      );
+}
+
 class ArtisanStats {
   final int products;
   final int listed;

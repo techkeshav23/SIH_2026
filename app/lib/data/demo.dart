@@ -158,6 +158,48 @@ class Demo {
     return orders.first;
   }
 
+  // ---- reviews ----
+  static final Map<String, List<Map<String, dynamic>>> reviews = {
+    'd1': [
+      {'id': 'r1', 'product_id': 'd1', 'author': 'Priya S.', 'rating': 5, 'text': 'Beautiful weave, the zari is stunning. Worth every rupee.', 'date': '2 weeks ago'},
+      {'id': 'r2', 'product_id': 'd1', 'author': 'Fabindia Buyer', 'rating': 4, 'text': 'Great quality for bulk order. Timely delivery.', 'date': '1 month ago'},
+    ],
+    'd2': [
+      {'id': 'r3', 'product_id': 'd2', 'author': 'Anil K.', 'rating': 5, 'text': 'Authentic Jaipur blue pottery. Hand-painted details are lovely.', 'date': '5 days ago'},
+    ],
+    'd3': [
+      {'id': 'r4', 'product_id': 'd3', 'author': 'Meera R.', 'rating': 5, 'text': 'So soft and warm — genuine pashmina. Highly recommend.', 'date': '3 weeks ago'},
+      {'id': 'r5', 'product_id': 'd3', 'author': 'Retail Store', 'rating': 5, 'text': 'Our customers love these. Reordering.', 'date': '1 month ago'},
+    ],
+  };
+
+  static List<Map<String, dynamic>> reviewsFor(String id) => reviews[id] ?? const [];
+
+  static Map<String, dynamic> addReview(String productId, int rating, String text) {
+    final r = {
+      'id': 'r${DateTime.now().millisecondsSinceEpoch}',
+      'product_id': productId, 'author': 'आप (You)', 'rating': rating, 'text': text, 'date': 'just now',
+    };
+    reviews.putIfAbsent(productId, () => []).insert(0, r);
+    return r;
+  }
+
+  // ---- notifications ----
+  static final List<Map<String, dynamic>> notifications = [
+    {'id': 'n1', 'title': 'भुगतान मिला', 'body': 'ऑर्डर #O3 का ₹16,000 भुगतान हो गया।', 'type': 'payment', 'read': false, 'time': '2h'},
+    {'id': 'n2', 'title': 'नया ऑर्डर', 'body': 'ब्लू पॉटरी फूलदान — 8 पीस का ऑर्डर मिला।', 'type': 'order', 'read': false, 'time': '5h'},
+    {'id': 'n3', 'title': 'नई समीक्षा', 'body': 'बनारसी साड़ी को 5-स्टार समीक्षा मिली।', 'type': 'system', 'read': true, 'time': '1d'},
+    {'id': 'n4', 'title': 'B2B पूछताछ', 'body': 'Fabindia ने पश्मीना शॉल के बारे में पूछताछ की।', 'type': 'inquiry', 'read': true, 'time': '2d'},
+  ];
+
+  static int unreadCount() => notifications.where((n) => n['read'] == false).length;
+
+  static void markAllRead() {
+    for (final n in notifications) {
+      n['read'] = true;
+    }
+  }
+
   // ---- profile ----
   static final Map<String, dynamic> profile = {
     'id': 'demo',
