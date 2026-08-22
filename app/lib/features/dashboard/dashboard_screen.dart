@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/l10n.dart';
 import '../../core/nav.dart';
 import '../../core/theme.dart';
+import '../../core/tts.dart';
 import '../../core/widgets.dart';
 import '../../data/api.dart';
 import '../../data/models.dart';
@@ -16,51 +18,73 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final lang = ref.watch(langProvider);
+    String t(String k) => T.of(context, lang, k);
     final stats = ref.watch(statsProvider);
     return AppScaffold(
       current: 2,
       body: stats.when(
         loading: () => const KLoading(),
-        error: (e, _) => KErrorState(
-          message: 'Could not load stats',
+        error: (_, _) => KErrorState(
+          message: t('could_not_load'),
           onRetry: () => ref.invalidate(statsProvider),
         ),
-        data: (s) => RefreshIndicator(
-          onRefresh: () async => ref.invalidate(statsProvider),
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              KHeader(
-                title: 'Dashboard',
-                leading: drawerButton(),
-                trailing: _EarningsHero(earnings: s.earnings, paid: s.ordersPaid),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    _EarningsBanner(earnings: s.earnings, paid: s.ordersPaid),
-                    Gap.m,
-                    GridView.count(
-                      crossAxisCount: 2,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: 1.35,
-                      children: [
-                        _StatCard(label: 'Products', value: '${s.products}', icon: Icons.inventory_2_rounded, color: AppColors.primary),
-                        _StatCard(label: 'Listed', value: '${s.listed}', icon: Icons.storefront_rounded, color: AppColors.accent),
-                        _StatCard(label: 'Total orders', value: '${s.ordersTotal}', icon: Icons.receipt_long_rounded, color: AppColors.indigo),
-                        _StatCard(label: 'Pending', value: '${s.ordersPending}', icon: Icons.hourglass_top_rounded, color: AppColors.success),
-                      ],
-                    ),
-                  ],
+        data: (s) {
+          final summary =
+              '${t('total_earnings')} ₹${s.earnings.toStringAsFixed(0)}. '
+              '${s.products} ${t('products')}, ${s.listed} ${t('listed')}.';
+          return RefreshIndicator(
+            onRefresh: () async => ref.invalidate(statsProvider),
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                KHeader(
+                  title: t('dashboard'),
+                  leading: drawerButton(),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      KSpeak(summary, color: Colors.white),
+                      _EarningsHero(
+                        earnings: s.earnings,
+                        paid: s.ordersPaid,
+                        fromPaid: t('from_paid'),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      _EarningsBanner(
+                        earnings: s.earnings,
+                        paid: s.ordersPaid,
+                        totalEarnings: t('total_earnings'),
+                        fromPaid: t('from_paid'),
+                      ),
+                      Gap.m,
+                      GridView.count(
+                        crossAxisCount: 2,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        mainAxisSpacing: 12,
+                        crossAxisSpacing: 12,
+                        childAspectRatio: 1.35,
+                        children: [
+                          _StatCard(label: t('products'), value: '${s.products}', icon: Icons.inventory_2_rounded, color: AppColors.primary),
+                          _StatCard(label: t('listed'), value: '${s.listed}', icon: Icons.storefront_rounded, color: AppColors.accent),
+                          _StatCard(label: t('total_orders'), value: '${s.ordersTotal}', icon: Icons.receipt_long_rounded, color: AppColors.indigo),
+                          _StatCard(label: t('pending'), value: '${s.ordersPending}', icon: Icons.hourglass_top_rounded, color: AppColors.success),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -68,9 +92,10 @@ class DashboardScreen extends ConsumerWidget {
 
 /// Compact earnings summary shown inside the gradient hero header.
 class _EarningsHero extends StatelessWidget {
-  const _EarningsHero({required this.earnings, required this.paid});
+  const _EarningsHero({required this.earnings, required this.paid, required this.fromPaid});
   final double earnings;
   final int paid;
+  final String fromPaid;
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -88,7 +113,7 @@ class _EarningsHero extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          'from $paid paid order${paid == 1 ? '' : 's'}',
+          '$paid $fromPaid',
           style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13),
         ),
       ],
@@ -98,9 +123,11 @@ class _EarningsHero extends StatelessWidget {
 
 /// Subtle repeat of total earnings as a labelled banner below the hero.
 class _EarningsBanner extends StatelessWidget {
-  const _EarningsBanner({required this.earnings, required this.paid});
+  const _EarningsBanner({required this.earnings, required this.paid, required this.totalEarnings, required this.fromPaid});
   final double earnings;
   final int paid;
+  final String totalEarnings;
+  final String fromPaid;
   @override
   Widget build(BuildContext context) {
     return KCard(
@@ -120,7 +147,7 @@ class _EarningsBanner extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Total earnings', style: Theme.of(context).textTheme.labelSmall),
+                Text(totalEarnings, style: Theme.of(context).textTheme.labelSmall),
                 const SizedBox(height: 2),
                 Text(
                   '₹${earnings.toStringAsFixed(0)}',
@@ -130,7 +157,7 @@ class _EarningsBanner extends StatelessWidget {
             ),
           ),
           Text(
-            'from $paid paid order${paid == 1 ? '' : 's'}',
+            '$paid $fromPaid',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
         ],

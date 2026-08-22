@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/l10n.dart';
 import '../../core/nav.dart';
 import '../../core/theme.dart';
+import '../../core/tts.dart';
 import '../../core/widgets.dart';
 import '../../data/api.dart';
 import '../../data/models.dart';
@@ -18,47 +20,60 @@ class MarketScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final feed = ref.watch(feedProvider);
+    final lang = ref.watch(langProvider);
+    final title = T.of(context, lang, 'b2b_marketplace');
+    final subtitle = T.of(context, lang, 'ondc_ready');
     return AppScaffold(
       current: 3,
       body: Column(
         children: [
           KHeader(
-            title: 'B2B Marketplace',
-            subtitle: 'Powered by ONDC · GeM ready',
+            title: title,
+            subtitle: subtitle,
             leading: drawerButton(),
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(Radii.pill),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.verified_rounded, size: 15, color: Colors.white),
-                  SizedBox(width: 6),
-                  Text('Govt · ONDC',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.2)),
-                ],
-              ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                KSpeak('$title. $subtitle', color: Colors.white),
+                const SizedBox(width: 4),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(Radii.pill),
+                    border:
+                        Border.all(color: Colors.white.withValues(alpha: 0.35)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.verified_rounded,
+                          size: 15, color: Colors.white),
+                      SizedBox(width: 6),
+                      Text('Govt · ONDC',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.2)),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
           Expanded(
             child: feed.when(
               loading: () => const KLoading(),
               error: (e, _) => KErrorState(
-                message: 'Could not load marketplace',
+                message: T.of(context, lang, 'could_not_load'),
                 onRetry: () => ref.invalidate(feedProvider),
               ),
               data: (items) => items.isEmpty
-                  ? const KEmpty(
+                  ? KEmpty(
                       icon: Icons.storefront_outlined,
-                      title: 'No listed products yet',
+                      title: T.of(context, lang, 'no_listed'),
                       subtitle:
                           'Listed crafts from artisans will appear here for bulk inquiry.',
                     )
@@ -177,38 +192,39 @@ class _FeedCard extends StatelessWidget {
   }
 }
 
-class _InquirySheet extends StatefulWidget {
+class _InquirySheet extends ConsumerStatefulWidget {
   const _InquirySheet({required this.p, required this.api});
   final Product p;
   final Api api;
   @override
-  State<_InquirySheet> createState() => _InquirySheetState();
+  ConsumerState<_InquirySheet> createState() => _InquirySheetState();
 }
 
-class _InquirySheetState extends State<_InquirySheet> {
+class _InquirySheetState extends ConsumerState<_InquirySheet> {
   final _org = TextEditingController();
   final _msg = TextEditingController(
       text: 'Interested in bulk order. Please share MOQ & rate.');
   bool _sending = false;
 
   Future<void> _send() async {
+    final lang = ref.read(langProvider);
     if (_org.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter your organization name')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(T.of(context, lang, 'org_name'))));
       return;
     }
     final messenger = ScaffoldMessenger.of(context);
     final nav = Navigator.of(context);
+    final sentMsg = T.of(context, lang, 'inquiry_sent');
+    final failMsg = T.of(context, lang, 'could_not_load');
     setState(() => _sending = true);
     try {
       await widget.api
           .sendInquiry(widget.p.id, _org.text.trim(), _msg.text.trim());
       nav.pop();
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Inquiry sent to artisan ✓')));
+      messenger.showSnackBar(SnackBar(content: Text(sentMsg)));
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Could not send inquiry — please try again')));
+      messenger.showSnackBar(SnackBar(content: Text(failMsg)));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -216,6 +232,7 @@ class _InquirySheetState extends State<_InquirySheet> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = ref.watch(langProvider);
     final title = widget.p.titleEn ?? widget.p.titleHi ?? 'this product';
     return Padding(
       padding: EdgeInsets.only(
@@ -255,7 +272,7 @@ class _InquirySheetState extends State<_InquirySheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Send inquiry',
+                    Text(T.of(context, lang, 'inquire'),
                         style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 2),
                     Text(title,
@@ -271,17 +288,17 @@ class _InquirySheetState extends State<_InquirySheet> {
           TextField(
             controller: _org,
             textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(
-              labelText: 'Your organization / GSTIN',
-              prefixIcon: Icon(Icons.business_outlined),
+            decoration: InputDecoration(
+              labelText: T.of(context, lang, 'org_name'),
+              prefixIcon: const Icon(Icons.business_outlined),
             ),
           ),
           Gap.m,
           TextField(
             controller: _msg,
             maxLines: 3,
-            decoration: const InputDecoration(
-              labelText: 'Message',
+            decoration: InputDecoration(
+              labelText: T.of(context, lang, 'message'),
               alignLabelWithHint: true,
             ),
           ),
@@ -296,7 +313,9 @@ class _InquirySheetState extends State<_InquirySheet> {
                         strokeWidth: 2, color: Colors.white),
                   )
                 : const Icon(Icons.send_rounded),
-            label: Text(_sending ? 'Sending…' : 'Send inquiry'),
+            label: Text(_sending
+                ? T.of(context, lang, 'processing')
+                : T.of(context, lang, 'send_inquiry')),
           ),
         ],
       ),

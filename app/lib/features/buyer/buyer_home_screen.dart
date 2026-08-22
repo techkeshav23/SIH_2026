@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/l10n.dart';
 import '../../core/theme.dart';
+import '../../core/tts.dart';
 import '../../core/widgets.dart';
 import '../../data/api.dart';
 import '../../data/models.dart';
@@ -123,18 +124,21 @@ class _BuyerHomeScreenState extends ConsumerState<BuyerHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = ref.watch(langProvider);
+    final title = T.of(context, lang, _tab == 0 ? 'marketplace' : 'my_orders');
     return Scaffold(
       drawer: const _BuyerDrawer(),
       appBar: AppBar(
-        title: Text(_tab == 0 ? 'Marketplace' : 'My Orders'),
+        title: Text(title),
+        actions: [KSpeak(title)],
       ),
       body: _tab == 0 ? const _BrowseTab() : const _MyOrdersTab(),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
         onDestinationSelected: (i) => setState(() => _tab = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.storefront), label: 'Browse'),
-          NavigationDestination(icon: Icon(Icons.receipt_long), label: 'Orders'),
+        destinations: [
+          NavigationDestination(icon: const Icon(Icons.storefront), label: T.of(context, lang, 'browse')),
+          NavigationDestination(icon: const Icon(Icons.receipt_long), label: T.of(context, lang, 'orders')),
         ],
       ),
     );
@@ -229,14 +233,15 @@ class _BrowseTab extends ConsumerWidget {
   }
 }
 
-class _ProductTile extends StatelessWidget {
+class _ProductTile extends ConsumerWidget {
   const _ProductTile({required this.product, required this.api, required this.onOrder, required this.onTap});
   final Product product;
   final Api api;
   final VoidCallback onOrder;
   final VoidCallback onTap;
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lang = ref.watch(langProvider);
     final img = product.enhancedImageUrl ?? product.rawImageUrl;
     final price = product.finalPrice ?? product.suggestedPriceMax;
     return Container(
@@ -278,7 +283,7 @@ class _ProductTile extends StatelessWidget {
                   child: FilledButton(
                     onPressed: onOrder,
                     style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(40)),
-                    child: const Text('Order', style: TextStyle(fontSize: 14)),
+                    child: Text(T.of(context, lang, 'order'), style: const TextStyle(fontSize: 14)),
                   ),
                 ),
               ],
@@ -308,14 +313,16 @@ class _OrderSheetState extends State<_OrderSheet> {
       await widget.ref.read(apiProvider).placeOrder(widget.product.id, _qty);
       widget.ref.invalidate(myOrdersProvider);
       if (mounted) {
+        final lang = widget.ref.read(langProvider);
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Order placed — awaiting artisan approval ✓')),
+          SnackBar(content: Text(T.of(context, lang, 'order_placed'))),
         );
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not place order')));
+        final lang = widget.ref.read(langProvider);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(T.of(context, lang, 'try_again'))));
       }
     } finally {
       if (mounted) setState(() => _placing = false);
@@ -324,6 +331,7 @@ class _OrderSheetState extends State<_OrderSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = widget.ref.watch(langProvider);
     final price = widget.product.finalPrice ?? widget.product.suggestedPriceMax ?? 0;
     return Padding(
       padding: EdgeInsets.only(left: 20, right: 20, top: 12,
@@ -348,7 +356,7 @@ class _OrderSheetState extends State<_OrderSheet> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Quantity', style: Theme.of(context).textTheme.titleMedium),
+              Text(T.of(context, lang, 'quantity'), style: Theme.of(context).textTheme.titleMedium),
               Container(
                 decoration: BoxDecoration(
                   color: AppColors.surfaceAlt,
@@ -382,7 +390,7 @@ class _OrderSheetState extends State<_OrderSheet> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('Total', style: Theme.of(context).textTheme.titleMedium),
+              Text(T.of(context, lang, 'total'), style: Theme.of(context).textTheme.titleMedium),
               Text('₹${(price * _qty).toStringAsFixed(0)}',
                   style: const TextStyle(
                       fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.success, letterSpacing: -0.6)),
@@ -396,7 +404,7 @@ class _OrderSheetState extends State<_OrderSheet> {
                     width: 18, height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                 : const Icon(Icons.check),
-            label: Text(_placing ? 'Placing…' : 'Place order'),
+            label: Text(_placing ? T.of(context, lang, 'processing') : T.of(context, lang, 'place_order')),
           ),
         ],
       ),
@@ -434,17 +442,20 @@ class _MyOrdersTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final orders = ref.watch(myOrdersProvider);
+    final lang = ref.watch(langProvider);
     return orders.when(
       loading: () => const KLoading(),
       error: (e, _) => KErrorState(
-        message: 'Could not load orders',
+        message: T.of(context, lang, 'could_not_load'),
         onRetry: () => ref.invalidate(myOrdersProvider),
       ),
       data: (items) => items.isEmpty
-          ? const KEmpty(
+          ? KEmpty(
               icon: Icons.receipt_long_outlined,
-              title: 'No orders yet',
-              subtitle: 'Browse the marketplace to place your first order.',
+              title: T.of(context, lang, 'no_orders'),
+              subtitle: lang == AppLang.hi
+                  ? 'पहला ऑर्डर करने के लिए बाज़ार देखें।'
+                  : 'Browse the marketplace to place your first order.',
             )
           : RefreshIndicator(
               color: AppColors.primary,
@@ -460,27 +471,29 @@ class _MyOrdersTab extends ConsumerWidget {
   }
 }
 
-class _BuyerOrderCard extends StatelessWidget {
+class _BuyerOrderCard extends ConsumerWidget {
   const _BuyerOrderCard({required this.order, required this.ref});
   final Order order;
   final WidgetRef ref;
 
   Future<void> _pay(BuildContext context) async {
+    final lang = ref.read(langProvider);
     try {
       await ref.read(apiProvider).payAndConfirm(order.id);
       ref.invalidate(myOrdersProvider);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment successful ✓')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(T.of(context, lang, 'payment_ok'))));
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment failed')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(T.of(context, lang, 'try_again'))));
       }
     }
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lang = ref.watch(langProvider);
     return KCard(
       onTap: () => context.push('/order-detail', extra: order),
       child: Column(
@@ -488,7 +501,7 @@ class _BuyerOrderCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: Text('Order #${order.id.substring(0, 6)}',
+              Expanded(child: Text('${T.of(context, lang, 'order_no')} #${order.id.substring(0, 6)}',
                   style: Theme.of(context).textTheme.titleMedium)),
               KStatusPill(order.status),
             ],
@@ -498,7 +511,7 @@ class _BuyerOrderCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('Qty: ${order.quantity}', style: Theme.of(context).textTheme.bodyMedium),
+              Text('${T.of(context, lang, 'qty')}: ${order.quantity}', style: Theme.of(context).textTheme.bodyMedium),
               Text('₹${order.totalPrice.toStringAsFixed(0)}',
                   style: const TextStyle(
                       fontWeight: FontWeight.w800, color: AppColors.success, fontSize: 20, letterSpacing: -0.4)),
@@ -511,7 +524,7 @@ class _BuyerOrderCard extends StatelessWidget {
               child: FilledButton.icon(
                 onPressed: () => _pay(context),
                 icon: const Icon(Icons.payment),
-                label: const Text('Pay now'),
+                label: Text(T.of(context, lang, 'pay_now')),
               ),
             ),
           ],

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/l10n.dart';
 import '../../core/theme.dart';
+import '../../core/tts.dart';
 import '../../core/widgets.dart';
 import '../../data/api.dart';
 import '../../data/models.dart';
@@ -47,28 +48,32 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     } catch (_) {
       if (mounted) {
         setState(() => _loading = false);
+        final lang = ref.read(langProvider);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not load product')));
+          SnackBar(content: Text(T.of(context, lang, 'could_not_load'))));
         context.pop();
       }
     }
   }
 
   Future<void> _save({bool publish = false}) async {
+    final lang = ref.read(langProvider);
     final price = double.tryParse(_price.text.trim());
+    final okMsg = T.of(context, lang, publish ? 'listed_ok' : 'saved');
+    final failMsg = T.of(context, lang, 'try_again');
     if (publish) {
       if (_titleHi.text.trim().isEmpty && _titleEn.text.trim().isEmpty) {
-        _snack('Add a title before listing');
+        _snack(T.of(context, lang, 'add_title_first'));
         return;
       }
       if (price == null || price <= 0) {
-        _snack('Set a valid price before listing');
+        _snack(T.of(context, lang, 'set_price_first'));
         return;
       }
       final ok = await confirmDialog(context,
-          title: 'List on marketplace?',
-          message: 'This makes the product visible to B2B buyers.',
-          confirm: 'List');
+          title: T.of(context, lang, 'list_q'),
+          message: T.of(context, lang, 'list_msg'),
+          confirm: T.of(context, lang, 'publish'));
       if (!ok) return;
     }
     setState(() => _saving = true);
@@ -83,11 +88,11 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       final p = await _api.updateProduct(widget.productId, patch);
       setState(() => _p = p);
       if (mounted) {
-        _snack(publish ? 'Listed on marketplace ✓' : 'Saved ✓');
+        _snack(okMsg);
         if (publish) context.pop();
       }
     } catch (_) {
-      _snack('Could not save — please try again');
+      _snack(failMsg);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -107,6 +112,10 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       appBar: AppBar(
         title: Text(T.of(context, lang, 'my_products')),
         actions: [
+          KSpeak([
+            _titleHi.text.trim().isNotEmpty ? _titleHi.text : _titleEn.text,
+            _descHi.text,
+          ].where((s) => s.trim().isNotEmpty).join('. ')),
           if (p != null) KStatusPill(p.status),
           const SizedBox(width: 12),
         ],
@@ -124,18 +133,18 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                     radius: Radii.lg,
                   ),
                 Gap.m,
-                const KSectionTitle('Listing'),
+                KSectionTitle(T.of(context, lang, 'listing')),
                 Gap.s,
-                _field('शीर्षक (हिंदी)', _titleHi),
-                _field('Title (English)', _titleEn),
-                _field('विवरण (हिंदी)', _descHi, maxLines: 4),
+                _field(T.of(context, lang, 'title_hi'), _titleHi),
+                _field(T.of(context, lang, 'title_en'), _titleEn),
+                _field(T.of(context, lang, 'desc_hi'), _descHi, maxLines: 4),
                 if (p.tags.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Wrap(spacing: 6, children: [for (final t in p.tags) Chip(label: Text('#$t'))]),
                   ),
                 Gap.m,
-                const KSectionTitle('Pricing'),
+                KSectionTitle(T.of(context, lang, 'pricing')),
                 Gap.s,
                 if (p.suggestedPriceMin != null) ...[
                   Container(
@@ -151,7 +160,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                         Gap.s,
                         Expanded(
                           child: Text(
-                            'AI suggested: ₹${p.suggestedPriceMin!.toStringAsFixed(0)} – ₹${p.suggestedPriceMax!.toStringAsFixed(0)}',
+                            '${T.of(context, lang, 'ai_suggested')}: ₹${p.suggestedPriceMin!.toStringAsFixed(0)} – ₹${p.suggestedPriceMax!.toStringAsFixed(0)}',
                             style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.w700),
                           ),
                         ),
@@ -160,7 +169,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                   ),
                   Gap.m,
                 ],
-                _field('Final price (₹)', _price,
+                _field(T.of(context, lang, 'final_price'), _price,
                     keyboard: const TextInputType.numberWithOptions(decimal: true),
                     formatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))]),
                 Gap.l,
@@ -169,7 +178,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: _saving ? null : () => _save(),
-                        child: const Text('Save'),
+                        child: Text(T.of(context, lang, 'save')),
                       ),
                     ),
                     const SizedBox(width: 12),

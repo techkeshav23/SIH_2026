@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/l10n.dart';
 import '../../core/theme.dart';
+import '../../core/tts.dart';
 import '../../core/widgets.dart';
 import '../../data/api.dart';
 import '../../data/local_store.dart';
@@ -43,26 +44,28 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
     final file = await _picker.pickImage(
         source: ImageSource.camera, imageQuality: 90);
     if (file == null) return;
-    setState(() { _busy = true; _status = 'AI enhancing photo…'; });
+    final lang = ref.read(langProvider);
+    setState(() { _busy = true; _status = T.of(context, lang, 'enhancing'); });
     try {
       await _ensureProduct();
       await _api.enhanceImage(_product!.id, file.path);
       final ready = await _api.pollUntilReady(_product!.id);
       setState(() => _product = ready);
     } catch (_) {
-      _snack('Enhancement failed — please try again');
+      _snack(lang == AppLang.hi ? 'फ़ोटो सुधार नहीं हो सका — फिर कोशिश करें' : 'Enhancement failed — please try again');
     } finally {
       if (mounted) setState(() { _busy = false; _status = ''; });
     }
   }
 
   Future<void> _catalogFromText() async {
+    final uiLang = ref.read(langProvider);
     if (_textCtrl.text.trim().isEmpty) {
-      _snack('Describe your product first');
+      _snack(uiLang == AppLang.hi ? 'पहले उत्पाद के बारे में बताएं' : 'Describe your product first');
       return;
     }
-    final lang = ref.read(langProvider) == AppLang.hi ? 'hi' : 'en';
-    setState(() { _busy = true; _status = 'Writing listing…'; });
+    final lang = uiLang == AppLang.hi ? 'hi' : 'en';
+    setState(() { _busy = true; _status = T.of(context, uiLang, 'writing_listing'); });
     try {
       await _ensureProduct();
       final p = await _api.catalogFromText(_product!.id, _textCtrl.text.trim(), sourceLang: lang);
@@ -78,7 +81,9 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
         ));
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No internet — saved offline, will sync later')),
+            SnackBar(content: Text(uiLang == AppLang.hi
+                ? 'इंटरनेट नहीं — ऑफ़लाइन सहेजा, बाद में सिंक होगा'
+                : 'No internet — saved offline, will sync later')),
           );
           context.pop();
         }
@@ -96,31 +101,33 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
       e.type == DioExceptionType.unknown;
 
   Future<void> _suggestPrice() async {
-    setState(() { _busy = true; _status = 'Analysing market…'; });
+    final lang = ref.read(langProvider);
+    setState(() { _busy = true; _status = T.of(context, lang, 'analysing_market'); });
     try {
       await _ensureProduct();
       final price = await _api.suggestPrice(_product!.id);
       final p = await _api.getProduct(_product!.id);
       setState(() { _price = price; _product = p; });
     } catch (_) {
-      _snack('Could not fetch price — please try again');
+      _snack(lang == AppLang.hi ? 'क़ीमत नहीं मिली — फिर कोशिश करें' : 'Could not fetch price — please try again');
     } finally {
       if (mounted) setState(() { _busy = false; _status = ''; });
     }
   }
 
   Future<void> _publish() async {
+    final lang = ref.read(langProvider);
     final ok = await confirmDialog(context,
-        title: 'List on marketplace?',
-        message: 'This makes the product visible to B2B buyers.',
-        confirm: 'List');
+        title: T.of(context, lang, 'list_q'),
+        message: T.of(context, lang, 'list_msg'),
+        confirm: T.of(context, lang, 'publish'));
     if (!ok) return;
-    setState(() { _busy = true; _status = 'Listing…'; });
+    setState(() { _busy = true; _status = T.of(context, lang, 'processing'); });
     try {
       await _api.updateProduct(_product!.id, {'status': 'listed'});
       if (mounted) context.pop();
     } catch (_) {
-      _snack('Could not list — please try again');
+      _snack(lang == AppLang.hi ? 'लिस्ट नहीं हो सका — फिर कोशिश करें' : 'Could not list — please try again');
     } finally {
       if (mounted) setState(() { _busy = false; _status = ''; });
     }
@@ -132,7 +139,14 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
     final text = Theme.of(context).textTheme;
     final p = _product;
     return Scaffold(
-      appBar: AppBar(title: Text(T.of(context, lang, 'add_product'))),
+      appBar: AppBar(
+        title: Text(T.of(context, lang, 'add_product')),
+        actions: [
+          KSpeak(lang == AppLang.hi
+              ? 'फ़ोटो खींचें, आवाज़ या टाइप करके बताएं, फिर क़ीमत सुझाएं'
+              : 'Take a photo, describe by voice or typing, then suggest a price'),
+        ],
+      ),
       body: Stack(
         children: [
           ListView(
@@ -147,7 +161,7 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (p?.enhancedImageUrl != null)
-                      _BeforeAfter(api: _api, product: p!)
+                      _BeforeAfter(api: _api, product: p!, lang: lang)
                     else if (p?.rawImageUrl != null)
                       KNetImage(_api.mediaUrl(p!.rawImageUrl!), height: 180, radius: Radii.md),
                     if (p?.enhancedImageUrl != null || p?.rawImageUrl != null) Gap.m,
@@ -177,7 +191,7 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
                       child: Row(children: [
                         const Icon(Icons.mic_none_rounded, size: 18, color: AppColors.muted),
                         const SizedBox(width: 8),
-                        Expanded(child: Text('Voice input coming soon — describe your product by typing',
+                        Expanded(child: Text(T.of(context, lang, 'voice_soon'),
                             style: text.labelSmall)),
                       ]),
                     ),
@@ -185,15 +199,17 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
                     TextField(
                       controller: _textCtrl,
                       maxLines: 2,
-                      decoration: const InputDecoration(
-                        hintText: 'हाथ से बुनी सूती साड़ी…',
+                      decoration: InputDecoration(
+                        hintText: lang == AppLang.hi
+                            ? 'हाथ से बुनी सूती साड़ी…'
+                            : 'Handwoven cotton saree…',
                       ),
                     ),
                     Gap.s,
                     FilledButton.icon(
                       onPressed: _busy ? null : _catalogFromText,
                       icon: const Icon(Icons.auto_awesome_rounded),
-                      label: const Text('Generate listing with AI'),
+                      label: Text(T.of(context, lang, 'generate_listing')),
                     ),
                     if (p?.titleEn != null) ...[
                       Gap.m,
@@ -260,7 +276,7 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
                                 const Icon(Icons.local_offer_rounded,
                                     size: 15, color: AppColors.success),
                                 const SizedBox(width: 6),
-                                Text('Suggested price',
+                                Text(lang == AppLang.hi ? 'सुझाई गई क़ीमत' : 'Suggested price',
                                     style: text.labelSmall
                                         ?.copyWith(color: AppColors.success)),
                               ],
@@ -401,9 +417,10 @@ class _StepCard extends StatelessWidget {
 /// Shows the AI-enhanced image with a rounded frame and a success "AI enhanced"
 /// pill overlaid in the corner. A draggable slider can be added later.
 class _BeforeAfter extends StatelessWidget {
-  const _BeforeAfter({required this.api, required this.product});
+  const _BeforeAfter({required this.api, required this.product, required this.lang});
   final Api api;
   final Product product;
+  final AppLang lang;
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -424,13 +441,13 @@ class _BeforeAfter extends StatelessWidget {
               borderRadius: BorderRadius.circular(Radii.pill),
               boxShadow: Decor.soft,
             ),
-            child: const Row(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.auto_awesome, size: 14, color: Colors.white),
-                SizedBox(width: 5),
-                Text('AI enhanced',
-                    style: TextStyle(
+                const Icon(Icons.auto_awesome, size: 14, color: Colors.white),
+                const SizedBox(width: 5),
+                Text(T.of(context, lang, 'ai_enhanced'),
+                    style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
                         fontWeight: FontWeight.w700)),
