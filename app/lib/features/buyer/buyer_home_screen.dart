@@ -209,7 +209,7 @@ class _BrowseTab extends ConsumerWidget {
                     child: GridView.builder(
                       padding: const EdgeInsets.all(16),
                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2, childAspectRatio: 0.62, crossAxisSpacing: 14, mainAxisSpacing: 14),
+                        crossAxisCount: 2, childAspectRatio: 0.72, crossAxisSpacing: 14, mainAxisSpacing: 14),
                       itemCount: items.length,
                       itemBuilder: (ctx, i) => _ProductTile(
                         product: items[i], api: api,
@@ -501,8 +501,22 @@ class _BuyerOrderCard extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Expanded(child: Text('${T.of(context, lang, 'order_no')} #${order.id.substring(0, 6)}',
-                  style: Theme.of(context).textTheme.titleMedium)),
+              KNetImage(order.productImage, width: 52, height: 52),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(order.productTitle ?? '${T.of(context, lang, 'order_no')} #${order.id.substring(0, 6)}',
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 2),
+                    Text('${T.of(context, lang, 'order_no')} #${order.id.substring(0, 6)}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.muted)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
               KStatusPill(order.status),
             ],
           ),

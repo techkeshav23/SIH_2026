@@ -41,14 +41,17 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
   }
 
   Future<void> _takePhoto() async {
-    final file = await _picker.pickImage(
-        source: ImageSource.camera, imageQuality: 90);
-    if (file == null) return;
     final lang = ref.read(langProvider);
+    String path = '';
+    if (!_api.demoMode) {
+      final file = await _picker.pickImage(source: ImageSource.camera, imageQuality: 90);
+      if (file == null) return;
+      path = file.path;
+    }
     setState(() { _busy = true; _status = T.of(context, lang, 'enhancing'); });
     try {
       await _ensureProduct();
-      await _api.enhanceImage(_product!.id, file.path);
+      await _api.enhanceImage(_product!.id, path); // demo ignores path, returns sample before/after
       final ready = await _api.pollUntilReady(_product!.id);
       setState(() => _product = ready);
     } catch (_) {
@@ -56,6 +59,22 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
     } finally {
       if (mounted) setState(() { _busy = false; _status = ''; });
     }
+  }
+
+  /// Demo-mode voice: simulate listening, fill a canned transcript, then catalog.
+  Future<void> _simulateVoice() async {
+    final uiLang = ref.read(langProvider);
+    if (!_api.demoMode) {
+      _snack(uiLang == AppLang.hi ? 'नीचे टाइप करके बताएं' : 'Please describe by typing below');
+      return;
+    }
+    setState(() { _busy = true; _status = uiLang == AppLang.hi ? 'सुन रहा है…' : 'Listening…'; });
+    await Future.delayed(const Duration(milliseconds: 1300));
+    _textCtrl.text = uiLang == AppLang.hi
+        ? 'यह हाथ से बुनी बनारसी रेशम साड़ी है, सुनहरी ज़री के साथ'
+        : 'This is a handwoven Banarasi silk saree with golden zari work';
+    if (mounted) setState(() {});
+    await _catalogFromText();
   }
 
   Future<void> _catalogFromText() async {
@@ -181,20 +200,20 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceAlt,
-                        borderRadius: BorderRadius.circular(Radii.md),
-                        border: Border.all(color: AppColors.line),
-                      ),
-                      child: Row(children: [
-                        const Icon(Icons.mic_none_rounded, size: 18, color: AppColors.muted),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text(T.of(context, lang, 'voice_soon'),
-                            style: text.labelSmall)),
-                      ]),
+                    FilledButton.icon(
+                      onPressed: _busy ? null : _simulateVoice,
+                      icon: const Icon(Icons.mic_rounded),
+                      label: Text(T.of(context, lang, 'record_voice')),
                     ),
+                    Gap.m,
+                    Row(children: [
+                      const Expanded(child: Divider()),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Text(lang == AppLang.hi ? 'या टाइप करें' : 'or type', style: text.labelSmall),
+                      ),
+                      const Expanded(child: Divider()),
+                    ]),
                     Gap.m,
                     TextField(
                       controller: _textCtrl,
@@ -206,7 +225,7 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
                       ),
                     ),
                     Gap.s,
-                    FilledButton.icon(
+                    OutlinedButton.icon(
                       onPressed: _busy ? null : _catalogFromText,
                       icon: const Icon(Icons.auto_awesome_rounded),
                       label: Text(T.of(context, lang, 'generate_listing')),
@@ -290,6 +309,28 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
                             Gap.s,
                             Text(_price!.reasoning,
                                 textAlign: TextAlign.center, style: text.bodyMedium),
+                            if (_price!.comparables.isNotEmpty) ...[
+                              Gap.m,
+                              const Divider(),
+                              Gap.s,
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(lang == AppLang.hi ? 'तुलना (बाज़ार)' : 'Comparable listings',
+                                    style: text.labelSmall),
+                              ),
+                              Gap.xs,
+                              for (final c in _price!.comparables)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 3),
+                                  child: Row(children: [
+                                    const Icon(Icons.circle, size: 5, color: AppColors.muted),
+                                    const SizedBox(width: 8),
+                                    Expanded(child: Text(c.title, style: text.bodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                                    Text('₹${c.price.toStringAsFixed(0)}',
+                                        style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textSoft)),
+                                  ]),
+                                ),
+                            ],
                           ],
                         ),
                       ),
@@ -414,48 +455,51 @@ class _StepCard extends StatelessWidget {
   }
 }
 
-/// Shows the AI-enhanced image with a rounded frame and a success "AI enhanced"
-/// pill overlaid in the corner. A draggable slider can be added later.
+/// Real before/after: the raw photo next to the AI-enhanced result, so the
+/// enhancement is visible. Falls back to just the enhanced image if no raw.
 class _BeforeAfter extends StatelessWidget {
   const _BeforeAfter({required this.api, required this.product, required this.lang});
   final Api api;
   final Product product;
   final AppLang lang;
+
+  Widget _framed(BuildContext context, String url, String label, {bool after = false}) {
+    return Expanded(
+      child: Column(children: [
+        Stack(children: [
+          KNetImage(api.mediaUrl(url), height: 150, width: double.infinity, radius: Radii.md),
+          if (after)
+            Positioned(
+              top: 8, left: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                    color: AppColors.success, borderRadius: BorderRadius.circular(Radii.pill), boxShadow: Decor.soft),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.auto_awesome, size: 12, color: Colors.white),
+                  const SizedBox(width: 4),
+                  Text(T.of(context, lang, 'ai_enhanced'),
+                      style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w700)),
+                ]),
+              ),
+            ),
+        ]),
+        const SizedBox(height: 6),
+        Text(label, style: Theme.of(context).textTheme.labelSmall),
+      ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        KNetImage(
-          api.mediaUrl(product.enhancedImageUrl!),
-          height: 200,
-          width: double.infinity,
-          radius: Radii.md,
-        ),
-        Positioned(
-          top: 10,
-          left: 10,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: AppColors.success,
-              borderRadius: BorderRadius.circular(Radii.pill),
-              boxShadow: Decor.soft,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.auto_awesome, size: 14, color: Colors.white),
-                const SizedBox(width: 5),
-                Text(T.of(context, lang, 'ai_enhanced'),
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700)),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
+    final raw = product.rawImageUrl;
+    if (raw == null) {
+      return _framed(context, product.enhancedImageUrl!, T.of(context, lang, 'ai_enhanced'), after: true);
+    }
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _framed(context, raw, lang == AppLang.hi ? 'पहले' : 'Before'),
+      const SizedBox(width: 10),
+      _framed(context, product.enhancedImageUrl!, lang == AppLang.hi ? 'बाद में' : 'After', after: true),
+    ]);
   }
 }

@@ -276,7 +276,7 @@ class Api {
   }
 
   Future<List<Order>> myOrders() async {
-    if (demoMode) return Demo.orders.map((e) => Order.fromJson(e)).toList();
+    if (demoMode) return Demo.buyerOrders().map((e) => Order.fromJson(e)).toList();
     final r = await _dio.get('/orders');
     return (r.data as List).map((e) => Order.fromJson(e)).toList();
   }

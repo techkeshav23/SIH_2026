@@ -41,17 +41,7 @@ class DashboardScreen extends ConsumerWidget {
                 KHeader(
                   title: t('dashboard'),
                   leading: drawerButton(),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      KSpeak(summary, color: Colors.white),
-                      _EarningsHero(
-                        earnings: s.earnings,
-                        paid: s.ordersPaid,
-                        fromPaid: t('from_paid'),
-                      ),
-                    ],
-                  ),
+                  trailing: KSpeak(summary, color: Colors.white),
                 ),
                 Padding(
                   padding: const EdgeInsets.all(16),
@@ -86,37 +76,6 @@ class DashboardScreen extends ConsumerWidget {
           );
         },
       ),
-    );
-  }
-}
-
-/// Compact earnings summary shown inside the gradient hero header.
-class _EarningsHero extends StatelessWidget {
-  const _EarningsHero({required this.earnings, required this.paid, required this.fromPaid});
-  final double earnings;
-  final int paid;
-  final String fromPaid;
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          '₹${earnings.toStringAsFixed(0)}',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 30,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.6,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          '$paid $fromPaid',
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13),
-        ),
-      ],
     );
   }
 }

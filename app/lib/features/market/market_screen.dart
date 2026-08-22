@@ -63,6 +63,27 @@ class MarketScreen extends ConsumerWidget {
               ],
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Row(
+              children: [
+                const Icon(Icons.visibility_outlined,
+                    size: 15, color: AppColors.muted),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    lang == AppLang.hi
+                        ? 'यह दिखाता है कि खरीदार आपकी सूचीबद्ध कलाकृतियाँ कैसे देखते हैं।'
+                        : 'How buyers discover your listed crafts.',
+                    style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
           Expanded(
             child: feed.when(
               loading: () => const KLoading(),
@@ -74,8 +95,9 @@ class MarketScreen extends ConsumerWidget {
                   ? KEmpty(
                       icon: Icons.storefront_outlined,
                       title: T.of(context, lang, 'no_listed'),
-                      subtitle:
-                          'Listed crafts from artisans will appear here for bulk inquiry.',
+                      subtitle: lang == AppLang.hi
+                          ? 'बाज़ार में सूचीबद्ध कलाकृतियाँ यहाँ थोक पूछताछ के लिए दिखेंगी।'
+                          : 'Listed crafts from artisans will appear here for bulk inquiry.',
                     )
                   : RefreshIndicator(
                       color: AppColors.primary,
@@ -90,8 +112,10 @@ class MarketScreen extends ConsumerWidget {
                           mainAxisSpacing: 14,
                         ),
                         itemCount: items.length,
-                        itemBuilder: (_, i) =>
-                            _FeedCard(p: items[i], api: ref.read(apiProvider)),
+                        itemBuilder: (_, i) => _FeedCard(
+                            p: items[i],
+                            api: ref.read(apiProvider),
+                            lang: lang),
                       ),
                     ),
             ),
@@ -103,9 +127,10 @@ class MarketScreen extends ConsumerWidget {
 }
 
 class _FeedCard extends StatelessWidget {
-  const _FeedCard({required this.p, required this.api});
+  const _FeedCard({required this.p, required this.api, required this.lang});
   final Product p;
   final Api api;
+  final AppLang lang;
 
   @override
   Widget build(BuildContext context) {
@@ -114,7 +139,7 @@ class _FeedCard extends StatelessWidget {
         ? '₹${p.finalPrice!.toStringAsFixed(0)}'
         : (p.suggestedPriceMin != null
             ? '₹${p.suggestedPriceMin!.toStringAsFixed(0)}+'
-            : 'Ask price');
+            : (lang == AppLang.hi ? 'मूल्य पूछें' : 'Ask price'));
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -165,7 +190,10 @@ class _FeedCard extends StatelessWidget {
                         const Icon(Icons.chat_bubble_outline_rounded,
                             size: 14, color: AppColors.primary),
                         const SizedBox(width: 6),
-                        Text('Tap to inquire',
+                        Text(
+                            lang == AppLang.hi
+                                ? 'पूछताछ के लिए टैप करें'
+                                : 'Tap to inquire',
                             style: TextStyle(
                               color: AppColors.primary.withValues(alpha: 0.9),
                               fontSize: 12,

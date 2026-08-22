@@ -28,7 +28,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _sendOtp() async {
     if (_phone.text.trim().length != 10) {
-      setState(() => _error = 'Enter a valid 10-digit phone number');
+      final lang = ref.read(langProvider);
+      setState(() => _error = T.of(context, lang, 'invalid_phone'));
       return;
     }
     setState(() { _loading = true; _error = null; });
@@ -38,7 +39,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           : await _api.buyerRequestOtp(_phone.text.trim());
       setState(() { _otpSent = true; if (devOtp != null) _otp.text = devOtp; });
     } catch (e) {
-      setState(() => _error = 'Could not reach server. Try "Continue in demo mode".');
+      final lang = ref.read(langProvider);
+      setState(() => _error = lang == AppLang.hi
+          ? 'सर्वर से संपर्क नहीं हो सका। "डेमो मोड में देखें" आज़माएं।'
+          : 'Could not reach server. Try "Continue in demo mode".');
     } finally {
       setState(() => _loading = false);
     }
@@ -46,7 +50,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _verify() async {
     if (_otp.text.trim().length != 6) {
-      setState(() => _error = 'Enter the 6-digit OTP');
+      final lang = ref.read(langProvider);
+      setState(() => _error = T.of(context, lang, 'invalid_otp'));
       return;
     }
     setState(() { _loading = true; _error = null; });
@@ -58,7 +63,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
       if (mounted) context.go(_home);
     } catch (e) {
-      setState(() => _error = 'Invalid OTP');
+      final lang = ref.read(langProvider);
+      setState(() => _error = lang == AppLang.hi ? 'ग़लत OTP' : 'Invalid OTP');
     } finally {
       setState(() => _loading = false);
     }
@@ -115,9 +121,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       selectedForegroundColor: Colors.white,
                       side: const BorderSide(color: AppColors.line),
                     ),
-                    segments: const [
-                      ButtonSegment(value: Role.artisan, label: Text('Artisan'), icon: Icon(Icons.brush)),
-                      ButtonSegment(value: Role.buyer, label: Text('Buyer'), icon: Icon(Icons.shopping_bag)),
+                    segments: [
+                      ButtonSegment(value: Role.artisan, label: Text(T.of(context, lang, 'artisan')), icon: const Icon(Icons.brush)),
+                      ButtonSegment(value: Role.buyer, label: Text(T.of(context, lang, 'buyer')), icon: const Icon(Icons.shopping_bag)),
                     ],
                     selected: {_role},
                     onSelectionChanged: _otpSent ? null : (s) => setState(() => _role = s.first),
@@ -175,7 +181,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const Expanded(child: Divider()),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 10),
-                      child: Text('or', style: Theme.of(context).textTheme.labelSmall),
+                      child: Text(lang == AppLang.hi ? 'या' : 'or', style: Theme.of(context).textTheme.labelSmall),
                     ),
                     const Expanded(child: Divider()),
                   ]),
@@ -183,7 +189,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   OutlinedButton.icon(
                     onPressed: _loading ? null : _enterDemo,
                     icon: const Icon(Icons.play_circle_outline),
-                    label: const Text('Continue in demo mode'),
+                    label: Text(T.of(context, lang, 'demo_mode')),
                   ),
                   const SizedBox(height: 8),
                   Center(

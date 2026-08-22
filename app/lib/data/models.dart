@@ -122,6 +122,8 @@ class Comparable {
 class Order {
   final String id;
   final String productId;
+  final String? productTitle;
+  final String? productImage;
   final int quantity;
   final double unitPrice;
   final double totalPrice;
@@ -131,6 +133,8 @@ class Order {
   Order({
     required this.id,
     required this.productId,
+    this.productTitle,
+    this.productImage,
     required this.quantity,
     required this.unitPrice,
     required this.totalPrice,
@@ -141,6 +145,8 @@ class Order {
   factory Order.fromJson(Map<String, dynamic> j) => Order(
         id: j['id'],
         productId: j['product_id'],
+        productTitle: j['product_title'],
+        productImage: j['product_image'],
         quantity: j['quantity'] ?? 1,
         unitPrice: (j['unit_price'] as num).toDouble(),
         totalPrice: (j['total_price'] as num).toDouble(),

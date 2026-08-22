@@ -130,6 +130,8 @@ class KHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.4)),
                 if (subtitle != null) ...[
                   const SizedBox(height: 4),
@@ -138,7 +140,7 @@ class KHeader extends StatelessWidget {
               ],
             ),
           ),
-          ?trailing,
+          if (trailing != null) Flexible(child: trailing!),
         ],
       ),
     );

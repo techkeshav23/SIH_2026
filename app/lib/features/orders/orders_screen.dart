@@ -99,20 +99,22 @@ class _OrderCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(Radii.sm),
-                ),
-                child: const Icon(Icons.receipt_long, color: AppColors.primary, size: 22),
-              ),
+              KNetImage(order.productImage, width: 52, height: 52),
               const SizedBox(width: 12),
               Expanded(
-                child: Text('${t('order_no')} #${order.id.substring(0, 6)}',
-                    style: Theme.of(context).textTheme.titleMedium),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(order.productTitle ?? '${t('order_no')} #${order.id.substring(0, 6)}',
+                        style: Theme.of(context).textTheme.titleMedium,
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 2),
+                    Text('${t('order_no')} #${order.id.substring(0, 6)}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.muted)),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               KStatusPill(order.status),
             ],
           ),
@@ -149,7 +151,7 @@ class _OrderCard extends StatelessWidget {
                           confirm: t('reject'), danger: true);
                       if (ok && context.mounted) {
                         await _act(context, () => api.rejectOrder(order.id),
-                            lang == AppLang.hi ? 'ऑर्डर अस्वीकार किया ✓' : 'Order rejected ✓');
+                            lang == AppLang.hi ? 'ऑर्डर अस्वीकार किया' : 'Order rejected');
                       }
                     },
                     child: Text(t('reject')),
@@ -159,7 +161,7 @@ class _OrderCard extends StatelessWidget {
                 Expanded(
                   child: FilledButton(
                     onPressed: () => _act(context, () => api.acceptOrder(order.id),
-                        lang == AppLang.hi ? 'ऑर्डर स्वीकार किया ✓' : 'Order accepted ✓'),
+                        lang == AppLang.hi ? 'ऑर्डर स्वीकार किया' : 'Order accepted'),
                     child: Text(t('accept')),
                   ),
                 ),

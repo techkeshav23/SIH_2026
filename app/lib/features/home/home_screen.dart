@@ -58,7 +58,7 @@ class HomeScreen extends ConsumerWidget {
               ref.invalidate(pendingProvider);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(n > 0 ? '$n draft(s) synced ✓' : 'Still offline')));
+                  SnackBar(content: Text(n > 0 ? '$n draft(s) synced' : 'Still offline')));
               }
             }),
           Expanded(

@@ -36,14 +36,16 @@ class OrderDetailScreen extends ConsumerWidget {
         children: [
           KCard(
             child: Row(children: [
-              Container(
-                width: 48, height: 48,
-                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.12), shape: BoxShape.circle),
-                child: const Icon(Icons.receipt_long_rounded, color: AppColors.primary),
-              ),
+              KNetImage(order.productImage, width: 56, height: 56),
               Gap.m,
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  if (order.productTitle != null) ...[
+                    Text(order.productTitle!,
+                        style: Theme.of(context).textTheme.titleMedium,
+                        maxLines: 2, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 4),
+                  ],
                   Text('${t('qty')}: ${order.quantity} × ₹${order.unitPrice.toStringAsFixed(0)}',
                       style: Theme.of(context).textTheme.bodyMedium),
                   const SizedBox(height: 2),
@@ -51,6 +53,7 @@ class OrderDetailScreen extends ConsumerWidget {
                       style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 22, color: AppColors.success)),
                 ]),
               ),
+              Gap.m,
               KStatusPill(order.status),
             ]),
           ),

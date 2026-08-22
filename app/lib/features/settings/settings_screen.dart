@@ -76,8 +76,8 @@ class SettingsScreen extends ConsumerWidget {
               Expanded(
                 child: Text(
                   lang == AppLang.hi
-                      ? 'किसी भी स्क्रीन पर 🔊 बटन दबाकर सुनें।'
-                      : 'Tap the 🔊 button on any screen to listen.',
+                      ? 'किसी भी स्क्रीन पर स्पीकर बटन दबाकर सुनें।'
+                      : 'Tap the speaker button on any screen to listen.',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ),
