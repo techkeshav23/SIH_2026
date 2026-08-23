@@ -169,11 +169,18 @@ class KNetImage extends StatelessWidget {
     );
     final u = url?.trim();
     if (u == null || u.isEmpty) return ph;
+    // Decode to the on-screen size, not the source resolution. AI-enhanced
+    // product JPEGs are ~1080px; decoding one into a 52px thumbnail wastes
+    // ~400x the pixels, janks the raster thread and thrashes the image cache.
+    final dpr = MediaQuery.of(context).devicePixelRatio;
+    final cw = (width != null && width!.isFinite) ? (width! * dpr).round() : null;
+    final ch = (height != null && height!.isFinite) ? (height! * dpr).round() : null;
     // demo images are bundled assets ("asset:<path>")
     if (u.startsWith('asset:')) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(radius),
         child: Image.asset(u.substring(6), width: width, height: height, fit: fit,
+            cacheWidth: cw, cacheHeight: ch,
             errorBuilder: (_, _, _) => ph),
       );
     }
@@ -183,6 +190,7 @@ class KNetImage extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
       child: Image.network(u, width: width, height: height, fit: fit,
+          cacheWidth: cw, cacheHeight: ch,
           errorBuilder: (_, _, _) => ph,
           loadingBuilder: (c, child, p) => p == null
               ? child

@@ -32,18 +32,26 @@ Future<void> main() async {
   });
 }
 
-class KalaSetuApp extends ConsumerWidget {
+class KalaSetuApp extends ConsumerStatefulWidget {
   const KalaSetuApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final api = ref.read(apiProvider);
+  ConsumerState<KalaSetuApp> createState() => _KalaSetuAppState();
+}
+
+class _KalaSetuAppState extends ConsumerState<KalaSetuApp> {
+  // Built once. Rebuilding the router on every widget rebuild (e.g. when the
+  // text-size slider changes) threw away the whole navigation stack.
+  late final _router = buildRouter(ref.read(apiProvider));
+
+  @override
+  Widget build(BuildContext context) {
     final scale = ref.watch(textScaleProvider);
     return MaterialApp.router(
       title: 'KalaSetu',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
-      routerConfig: buildRouter(api),
+      routerConfig: _router,
       builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
         // Base status-bar style for every route: DARK icons for the light cream
         // UI. Without this, a screen that set light icons (e.g. Home's dark hero)

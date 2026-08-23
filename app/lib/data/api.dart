@@ -41,7 +41,15 @@ class Api {
   /// The router listens to this to redirect back to /login.
   final ValueNotifier<int> authChanged = ValueNotifier(0);
 
-  Api() : _dio = Dio(BaseOptions(baseUrl: kBaseUrl)) {
+  Api()
+      : _dio = Dio(BaseOptions(
+          baseUrl: kBaseUrl,
+          // Without these a slow/unreachable backend leaves every screen stuck
+          // on a spinner forever (looks like the app hung). Fail fast instead.
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 30), // AI voice/image jobs
+          sendTimeout: const Duration(seconds: 30),
+        )) {
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) {
         if (_token != null) {

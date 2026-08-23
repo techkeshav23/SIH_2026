@@ -10,7 +10,9 @@ import '../../data/api.dart';
 import '../../data/models.dart';
 
 final statsProvider = FutureProvider.autoDispose<ArtisanStats>((ref) async {
-  return ref.read(apiProvider).artisanStats();
+  final stats = await ref.read(apiProvider).artisanStats();
+  ref.keepAlive();
+  return stats;
 });
 
 class DashboardScreen extends ConsumerWidget {

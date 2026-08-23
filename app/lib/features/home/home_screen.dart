@@ -14,7 +14,9 @@ import '../../data/models.dart';
 import '../notifications/notifications_screen.dart';
 
 final productsProvider = FutureProvider.autoDispose<List<Product>>((ref) async {
-  return ref.read(apiProvider).listProducts();
+  final list = await ref.read(apiProvider).listProducts();
+  ref.keepAlive(); // survive tab switches so the list isn't refetched every tap
+  return list;
 });
 
 final pendingProvider = FutureProvider.autoDispose<int>((ref) async {
@@ -32,19 +34,19 @@ class HomeHead {
 
 final homeHeadProvider = FutureProvider.autoDispose<HomeHead>((ref) async {
   final api = ref.read(apiProvider);
-  String? name;
-  ArtisanStats? stats;
-  int openQuotes = 0;
-  try {
-    name = (await api.getMe()).name;
-  } catch (_) {}
-  try {
-    stats = await api.artisanStats();
-  } catch (_) {}
-  try {
-    final qs = await api.incomingQuotes();
-    openQuotes = qs.where((q) => q.isOpen && q.turn == 'artisan').length;
-  } catch (_) {}
+  // Fire all three GETs concurrently — awaiting them in sequence made Home's
+  // first paint wait for the sum of three round-trips. Handlers are attached at
+  // creation so an early failure never surfaces as an unhandled error.
+  final nameF = api.getMe().then<String?>((u) => u.name, onError: (_) => null);
+  final statsF =
+      api.artisanStats().then<ArtisanStats?>((s) => s, onError: (_) => null);
+  final quotesF = api.incomingQuotes().then<int>(
+      (qs) => qs.where((q) => q.isOpen && q.turn == 'artisan').length,
+      onError: (_) => 0);
+  final name = await nameF;
+  final stats = await statsF;
+  final openQuotes = await quotesF;
+  ref.keepAlive();
   return HomeHead(name: name, stats: stats, openQuotes: openQuotes);
 });
 

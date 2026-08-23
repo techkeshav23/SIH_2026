@@ -12,7 +12,9 @@ import '../../data/api.dart';
 import '../../data/models.dart';
 
 final incomingOrdersProvider = FutureProvider.autoDispose<List<Order>>((ref) async {
-  return ref.read(apiProvider).incomingOrders();
+  final orders = await ref.read(apiProvider).incomingOrders();
+  ref.keepAlive(); // survive tab switches; refreshed via invalidate on actions
+  return orders;
 });
 
 /// Artisan's view of incoming B2B orders with accept / reject actions.
