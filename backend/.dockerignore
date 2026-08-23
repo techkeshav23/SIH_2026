@@ -8,3 +8,6 @@ tests/_test.db
 .env
 uploads/
 alembic/versions/__pycache__/
+
+.secret.txt
+.dbpw.txt

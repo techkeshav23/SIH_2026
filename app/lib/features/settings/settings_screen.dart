@@ -99,6 +99,16 @@ class SettingsScreen extends ConsumerWidget {
           ),
           Gap.m,
           KCard(
+            onTap: () => context.push('/privacy'),
+            child: Row(children: [
+              const Icon(Icons.privacy_tip_outlined, color: AppColors.primary),
+              Gap.m,
+              Expanded(child: Text(t('privacy_policy'), style: Theme.of(context).textTheme.titleMedium)),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+            ]),
+          ),
+          Gap.m,
+          KCard(
             onTap: () {
               showDialog(
                 context: context,

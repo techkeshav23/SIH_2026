@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/format.dart';
 import '../../core/l10n.dart';
 import '../../core/theme.dart';
 import '../../core/tts.dart';
@@ -52,20 +53,29 @@ class _BuyerDrawer extends ConsumerWidget {
         child: Column(children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(20, 26, 20, 22),
-            decoration: const BoxDecoration(gradient: Decor.heroGradient),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              border: Border(bottom: BorderSide(color: AppColors.line)),
+            ),
+            child: Row(children: [
               Container(
-                width: 56, height: 56, padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+                width: 44, height: 44, padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceAlt,
+                  borderRadius: BorderRadius.circular(Radii.sm),
+                  border: Border.all(color: AppColors.line),
+                ),
                 child: Image.asset('assets/icon/logo.png', fit: BoxFit.contain),
               ),
-              const SizedBox(height: 14),
-              const Text('KalaSetu',
-                  style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
-              const SizedBox(height: 2),
-              Text(api.demoMode ? (hi ? 'डेमो · खरीदार' : 'Demo · Buyer') : (hi ? 'खरीदार खाता' : 'Buyer account'),
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13)),
+              const SizedBox(width: 12),
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('KalaSetu',
+                    style: TextStyle(color: AppColors.text, fontSize: 19, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 1),
+                Text(api.demoMode ? (hi ? 'डेमो · खरीदार' : 'Demo · Buyer') : (hi ? 'खरीदार खाता' : 'Buyer account'),
+                    style: const TextStyle(color: AppColors.textSoft, fontSize: 12.5, fontWeight: FontWeight.w600)),
+              ]),
             ]),
           ),
           const SizedBox(height: 8),
@@ -74,6 +84,11 @@ class _BuyerDrawer extends ConsumerWidget {
             title: Text(hi ? 'भाषा: हिंदी' : 'Language: English',
                 style: const TextStyle(fontWeight: FontWeight.w600)),
             onTap: () => ref.read(langProvider.notifier).state = hi ? AppLang.en : AppLang.hi,
+          ),
+          ListTile(
+            leading: const Icon(Icons.gavel_rounded, color: AppColors.textSoft),
+            title: Text(hi ? 'थोक सौदे' : 'Bulk Quotes', style: const TextStyle(fontWeight: FontWeight.w600)),
+            onTap: () { Navigator.pop(context); context.push('/quotes'); },
           ),
           ListTile(
             leading: const Icon(Icons.settings_rounded, color: AppColors.textSoft),
@@ -96,10 +111,16 @@ class _BuyerDrawer extends ConsumerWidget {
               if (context.mounted) context.go('/login');
             },
           ),
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('SIH 2026 · PS 26090',
-                style: TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.4)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Text('KalaSetu v1.0', style: Theme.of(context).textTheme.labelSmall),
+              GestureDetector(
+                onTap: () { Navigator.pop(context); context.push('/privacy'); },
+                child: Text(hi ? 'गोपनीयता नीति' : 'Privacy Policy',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppColors.primary)),
+              ),
+            ]),
           ),
         ]),
       ),
@@ -311,13 +332,39 @@ class _ProductTile extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(product.titleEn ?? product.titleHi ?? 'Product',
+                Text(product.titleFor(lang == AppLang.hi) ?? 'Product',
                     maxLines: 1, overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 4),
-                Text(price != null ? '₹${price.toStringAsFixed(0)}' : '—',
-                    style: const TextStyle(
-                        color: AppColors.success, fontWeight: FontWeight.w800, fontSize: 16, letterSpacing: -0.2)),
+                if ((product.category ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(product.category!,
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall),
+                ],
+                const SizedBox(height: 6),
+                if (price == null)
+                  Text(T.of(context, lang, 'price_on_request'),
+                      style: const TextStyle(color: AppColors.text, fontWeight: FontWeight.w600, fontSize: 13))
+                else
+                  Builder(builder: (_) {
+                    final mrp = product.suggestedPriceMax;
+                    final hasDiscount = product.finalPrice != null && mrp != null && mrp > product.finalPrice!;
+                    final off = hasDiscount ? (((mrp - price) / mrp) * 100).round() : 0;
+                    return Row(crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic, children: [
+                      Text(rupees(price),
+                          style: const TextStyle(color: AppColors.text, fontWeight: FontWeight.w800, fontSize: 16)),
+                      if (hasDiscount) ...[
+                        const SizedBox(width: 6),
+                        Text(rupees(mrp),
+                            style: const TextStyle(
+                                color: AppColors.muted, fontSize: 12, decoration: TextDecoration.lineThrough)),
+                        const SizedBox(width: 5),
+                        Text('$off% off',
+                            style: const TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.w700)),
+                      ],
+                    ]);
+                  }),
                 const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
@@ -391,7 +438,7 @@ class _OrderSheetState extends State<_OrderSheet> {
               ),
             ),
           ),
-          Text(widget.product.titleEn ?? widget.product.titleHi ?? 'Product',
+          Text(widget.product.titleFor(ProviderScope.containerOf(context).read(langProvider) == AppLang.hi) ?? 'Product',
               style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 20),
           Row(
@@ -432,9 +479,9 @@ class _OrderSheetState extends State<_OrderSheet> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(T.of(context, lang, 'total'), style: Theme.of(context).textTheme.titleMedium),
-              Text('₹${(price * _qty).toStringAsFixed(0)}',
+              Text(rupees(price * _qty),
                   style: const TextStyle(
-                      fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.success, letterSpacing: -0.6)),
+                      fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.text)),
             ],
           ),
           const SizedBox(height: 20),
@@ -548,11 +595,11 @@ class _BuyerOrderCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(order.productTitle ?? '${T.of(context, lang, 'order_no')} #${order.id.substring(0, 6)}',
+                    Text(order.productTitle ?? '${T.of(context, lang, 'order_no')} #${order.shortId}',
                         maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 2),
-                    Text('${T.of(context, lang, 'order_no')} #${order.id.substring(0, 6)}',
+                    Text('${T.of(context, lang, 'order_no')} #${order.shortId}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.muted)),
                   ],
                 ),
@@ -567,9 +614,9 @@ class _BuyerOrderCard extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text('${T.of(context, lang, 'qty')}: ${order.quantity}', style: Theme.of(context).textTheme.bodyMedium),
-              Text('₹${order.totalPrice.toStringAsFixed(0)}',
+              Text(rupees(order.totalPrice),
                   style: const TextStyle(
-                      fontWeight: FontWeight.w800, color: AppColors.success, fontSize: 20, letterSpacing: -0.4)),
+                      fontWeight: FontWeight.w800, color: AppColors.text, fontSize: 20)),
             ],
           ),
           if (order.isAccepted) ...[

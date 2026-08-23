@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/format.dart';
 import '../../core/l10n.dart';
 import '../../core/theme.dart';
 import '../../core/tts.dart';
@@ -43,7 +44,8 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       _titleHi.text = p.titleHi ?? '';
       _titleEn.text = p.titleEn ?? '';
       _descHi.text = p.descHi ?? '';
-      _price.text = (p.finalPrice ?? p.suggestedPriceMax ?? '').toString();
+      final pv = p.finalPrice ?? p.suggestedPriceMax;
+      _price.text = pv == null ? '' : (pv % 1 == 0 ? pv.toInt().toString() : pv.toString());
       setState(() { _p = p; _loading = false; });
     } catch (_) {
       if (mounted) {
@@ -98,6 +100,28 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     }
   }
 
+  Future<void> _delete() async {
+    final lang = ref.read(langProvider);
+    final okMsg = T.of(context, lang, 'deleted_ok');
+    final failMsg = T.of(context, lang, 'try_again');
+    final ok = await confirmDialog(context,
+        title: T.of(context, lang, 'delete_product_q'),
+        message: T.of(context, lang, 'delete_product_msg'),
+        confirm: T.of(context, lang, 'delete_product'), danger: true);
+    if (!ok || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      await _api.deleteProduct(widget.productId);
+      if (mounted) {
+        _snack(okMsg);
+        context.pop();
+      }
+    } catch (_) {
+      _snack(failMsg);
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   void _snack(String msg) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
@@ -117,7 +141,13 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
             _descHi.text,
           ].where((s) => s.trim().isNotEmpty).join('. ')),
           if (p != null) KStatusPill(p.status),
-          const SizedBox(width: 12),
+          if (p != null)
+            IconButton(
+              tooltip: T.of(context, lang, 'delete_product'),
+              onPressed: _saving ? null : _delete,
+              icon: const Icon(Icons.delete_outline_rounded),
+            ),
+          const SizedBox(width: 4),
         ],
       ),
       body: _loading || p == null
@@ -146,7 +176,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                 Gap.m,
                 KSectionTitle(T.of(context, lang, 'pricing')),
                 Gap.s,
-                if (p.suggestedPriceMin != null) ...[
+                if (p.suggestedPriceMin != null || p.suggestedPriceMax != null) ...[
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     decoration: BoxDecoration(
@@ -160,7 +190,9 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                         Gap.s,
                         Expanded(
                           child: Text(
-                            '${T.of(context, lang, 'ai_suggested')}: ₹${p.suggestedPriceMin!.toStringAsFixed(0)} – ₹${p.suggestedPriceMax!.toStringAsFixed(0)}',
+                            (p.suggestedPriceMin != null && p.suggestedPriceMax != null)
+                                ? '${T.of(context, lang, 'ai_suggested')}: ${rupees(p.suggestedPriceMin!)} – ${rupees(p.suggestedPriceMax!)}'
+                                : '${T.of(context, lang, 'ai_suggested')}: ${rupees(p.suggestedPriceMax ?? p.suggestedPriceMin!)}',
                             style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.w700),
                           ),
                         ),

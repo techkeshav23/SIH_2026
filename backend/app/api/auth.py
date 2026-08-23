@@ -34,8 +34,8 @@ def request_otp(
     except otp_store.OtpError as e:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(e))
     sms.send_otp(body.phone, otp)
-    # Only leak the OTP in dev/console mode for convenience — never in prod.
-    dev_otp = otp if settings.is_dev and settings.sms_provider == "console" else None
+    # Return the OTP only when explicitly allowed (demo backend without real SMS).
+    dev_otp = otp if settings.allow_dev_otp else None
     return OtpSent(sent=True, dev_otp=dev_otp)
 
 

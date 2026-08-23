@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/format.dart';
 import '../../core/l10n.dart';
-import '../../core/nav.dart';
 import '../../core/theme.dart';
 import '../../core/tts.dart';
 import '../../core/widgets.dart';
@@ -21,8 +21,15 @@ class DashboardScreen extends ConsumerWidget {
     final lang = ref.watch(langProvider);
     String t(String k) => T.of(context, lang, k);
     final stats = ref.watch(statsProvider);
-    return AppScaffold(
-      current: 2,
+    final summary = stats.valueOrNull == null
+        ? ''
+        : '${t('total_earnings')} ${rupees(stats.value!.earnings)}. '
+            '${stats.value!.products} ${t('products')}, ${stats.value!.listed} ${t('listed')}.';
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(t('dashboard')),
+        actions: [if (summary.isNotEmpty) KSpeak(summary), const SizedBox(width: 8)],
+      ),
       body: stats.when(
         loading: () => const KLoading(),
         error: (_, _) => KErrorState(
@@ -30,19 +37,11 @@ class DashboardScreen extends ConsumerWidget {
           onRetry: () => ref.invalidate(statsProvider),
         ),
         data: (s) {
-          final summary =
-              '${t('total_earnings')} ₹${s.earnings.toStringAsFixed(0)}. '
-              '${s.products} ${t('products')}, ${s.listed} ${t('listed')}.';
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(statsProvider),
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
-                KHeader(
-                  title: t('dashboard'),
-                  leading: drawerButton(),
-                  trailing: KSpeak(summary, color: Colors.white),
-                ),
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -62,10 +61,11 @@ class DashboardScreen extends ConsumerWidget {
                         crossAxisSpacing: 12,
                         childAspectRatio: 1.35,
                         children: [
-                          _StatCard(label: t('products'), value: '${s.products}', icon: Icons.inventory_2_rounded, color: AppColors.primary),
-                          _StatCard(label: t('listed'), value: '${s.listed}', icon: Icons.storefront_rounded, color: AppColors.accent),
-                          _StatCard(label: t('total_orders'), value: '${s.ordersTotal}', icon: Icons.receipt_long_rounded, color: AppColors.indigo),
-                          _StatCard(label: t('pending'), value: '${s.ordersPending}', icon: Icons.hourglass_top_rounded, color: AppColors.success),
+                          _StatCard(label: t('products'), value: '${s.products}', icon: Icons.inventory_2_outlined),
+                          _StatCard(label: t('listed'), value: '${s.listed}', icon: Icons.storefront_outlined),
+                          _StatCard(label: t('total_orders'), value: '${s.ordersTotal}', icon: Icons.receipt_long_outlined),
+                          _StatCard(label: t('pending'), value: '${s.ordersPending}', icon: Icons.hourglass_empty_rounded,
+                              accent: s.ordersPending > 0 ? AppColors.accent : null),
                         ],
                       ),
                     ],
@@ -80,7 +80,7 @@ class DashboardScreen extends ConsumerWidget {
   }
 }
 
-/// Subtle repeat of total earnings as a labelled banner below the hero.
+/// Primary earnings card — the one strong-colour surface in the app.
 class _EarningsBanner extends StatelessWidget {
   const _EarningsBanner({required this.earnings, required this.paid, required this.totalEarnings, required this.fromPaid});
   final double earnings;
@@ -89,69 +89,58 @@ class _EarningsBanner extends StatelessWidget {
   final String fromPaid;
   @override
   Widget build(BuildContext context) {
-    return KCard(
-      child: Row(
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(Radii.md),
+        boxShadow: Decor.soft,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.payments_rounded, color: AppColors.primary),
-          ),
-          Gap.m,
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(totalEarnings, style: Theme.of(context).textTheme.labelSmall),
-                const SizedBox(height: 2),
-                Text(
-                  '₹${earnings.toStringAsFixed(0)}',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-              ],
-            ),
-          ),
-          Text(
-            '$paid $fromPaid',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
+          Row(children: [
+            const Icon(Icons.account_balance_wallet_outlined, color: Colors.white70, size: 18),
+            const SizedBox(width: 8),
+            Text(totalEarnings,
+                style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
+          ]),
+          const SizedBox(height: 8),
+          Text(rupees(earnings),
+              style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
+          const SizedBox(height: 6),
+          Text('$paid $fromPaid',
+              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
         ],
       ),
     );
   }
 }
 
+/// Neutral metric tile — dark number, muted label, small line icon (no rainbow
+/// pastel circles). An optional [accent] tints only when a value needs attention.
 class _StatCard extends StatelessWidget {
-  const _StatCard({required this.label, required this.value, required this.icon, required this.color});
+  const _StatCard({required this.label, required this.value, required this.icon, this.accent});
   final String label;
   final String value;
   final IconData icon;
-  final Color color;
+  final Color? accent;
   @override
-  Widget build(BuildContext context) => KCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.14),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: color, size: 22),
-            ),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            Text(label, style: Theme.of(context).textTheme.labelSmall),
-          ],
-        ),
-      );
+  Widget build(BuildContext context) {
+    final c = accent ?? AppColors.textSoft;
+    return KCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Icon(icon, color: c, size: 20),
+          Text(value,
+              style: TextStyle(
+                  color: accent ?? AppColors.text, fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
+          Text(label, style: Theme.of(context).textTheme.labelSmall),
+        ],
+      ),
+    );
+  }
 }

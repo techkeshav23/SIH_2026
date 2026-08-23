@@ -1,10 +1,14 @@
 from app.models.models import (
+    Address,
     Buyer,
     Inquiry,
+    Notification,
     Order,
     Payment,
     PriceSignal,
     Product,
+    Quote,
+    Review,
     User,
     VoiceNote,
 )
@@ -18,4 +22,8 @@ __all__ = [
     "Buyer",
     "Order",
     "Payment",
+    "Review",
+    "Notification",
+    "Address",
+    "Quote",
 ]

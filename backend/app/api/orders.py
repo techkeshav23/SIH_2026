@@ -4,8 +4,10 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_buyer, get_current_user
 from app.core.db import get_db
-from app.models import Buyer, Order, Payment, Product, User
+from app.models import Address, Buyer, Order, Payment, Product, User
 from app.models.schemas import (
+    AddressCreate,
+    AddressOut,
     OrderCreate,
     OrderOut,
     PaymentCheckout,
@@ -40,6 +42,16 @@ def create_order(
     if unit <= 0:
         raise HTTPException(status.HTTP_409_CONFLICT, "Product has no price set")
 
+    # Snapshot the chosen delivery address onto the order (denormalized).
+    ship_name = ship_phone = ship_address = None
+    if body.address_id:
+        addr = db.get(Address, body.address_id)
+        if not addr or addr.buyer_id != buyer.id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Address not found")
+        ship_name, ship_phone = addr.name, addr.phone
+        parts = [addr.line1, addr.line2, f"{addr.city}, {addr.state} - {addr.pincode}"]
+        ship_address = "\n".join(p for p in parts if p)
+
     order = Order(
         product_id=product.id,
         buyer_id=buyer.id,
@@ -49,6 +61,9 @@ def create_order(
         total_price=round(unit * body.quantity, 2),
         note=body.note,
         status="pending",
+        ship_name=ship_name,
+        ship_phone=ship_phone,
+        ship_address=ship_address,
     )
     db.add(order)
     db.commit()
@@ -170,3 +185,112 @@ def confirm_payment(
     db.refresh(o)
     notifications.order_paid(o.artisan_id, o.id)
     return o
+
+
+# ---------- fulfilment: ship -> deliver -> complete, or cancel ----------
+@router.post("/{order_id}/ship", response_model=OrderOut)
+def ship_order(
+    order_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Artisan dispatches a paid order."""
+    o = _get_order(db, order_id)
+    if o.artisan_id != user.id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not your order")
+    if o.status != "paid":
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Only a 'paid' order can be shipped (is '{o.status}')")
+    o.status = "shipped"
+    db.commit()
+    db.refresh(o)
+    notifications.order_shipped(o.buyer_id, o.id)
+    return o
+
+
+@router.post("/{order_id}/confirm-delivery", response_model=OrderOut)
+def confirm_delivery(
+    order_id: str,
+    buyer: Buyer = Depends(get_current_buyer),
+    db: Session = Depends(get_db),
+):
+    """Buyer confirms receipt -> order is completed."""
+    o = _get_order(db, order_id)
+    if o.buyer_id != buyer.id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not your order")
+    if o.status != "shipped":
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Only a 'shipped' order can be received (is '{o.status}')")
+    o.status = "completed"
+    db.commit()
+    db.refresh(o)
+    notifications.order_completed(o.artisan_id, o.id)
+    return o
+
+
+@router.post("/{order_id}/cancel", response_model=OrderOut)
+def cancel_order(
+    order_id: str,
+    buyer: Buyer = Depends(get_current_buyer),
+    db: Session = Depends(get_db),
+):
+    """Buyer cancels an order that hasn't been paid yet."""
+    o = _get_order(db, order_id)
+    if o.buyer_id != buyer.id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not your order")
+    if o.status not in ("pending", "accepted"):
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Cannot cancel an order in '{o.status}'")
+    o.status = "cancelled"
+    db.commit()
+    db.refresh(o)
+    notifications.order_cancelled(o.artisan_id, o.id)
+    return o
+
+
+# ---------- buyer delivery addresses ----------
+@router.get("/addresses", response_model=list[AddressOut])
+def list_addresses(
+    buyer: Buyer = Depends(get_current_buyer),
+    db: Session = Depends(get_db),
+):
+    stmt = (
+        select(Address)
+        .where(Address.buyer_id == buyer.id)
+        .order_by(Address.is_default.desc(), Address.created_at.desc())
+    )
+    return list(db.scalars(stmt))
+
+
+@router.post("/addresses", response_model=AddressOut, status_code=status.HTTP_201_CREATED)
+def add_address(
+    body: AddressCreate,
+    buyer: Buyer = Depends(get_current_buyer),
+    db: Session = Depends(get_db),
+):
+    # First address (or an explicit request) becomes the default.
+    existing = db.scalars(select(Address).where(Address.buyer_id == buyer.id)).all()
+    make_default = body.is_default or not existing
+    if make_default:
+        for a in existing:
+            a.is_default = False
+
+    addr = Address(
+        buyer_id=buyer.id, name=body.name, phone=body.phone, line1=body.line1,
+        line2=body.line2, city=body.city, state=body.state, pincode=body.pincode,
+        is_default=make_default,
+    )
+    db.add(addr)
+    db.commit()
+    db.refresh(addr)
+    return addr
+
+
+@router.delete("/addresses/{address_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_address(
+    address_id: str,
+    buyer: Buyer = Depends(get_current_buyer),
+    db: Session = Depends(get_db),
+):
+    addr = db.get(Address, address_id)
+    if not addr or addr.buyer_id != buyer.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Address not found")
+    db.delete(addr)
+    db.commit()

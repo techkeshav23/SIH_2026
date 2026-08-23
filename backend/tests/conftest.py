@@ -9,6 +9,7 @@ if os.path.exists(_TEST_DB):
 os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DB}"
 os.environ["RATE_LIMIT_ENABLED"] = "false"
 os.environ["APP_ENV"] = "dev"
+os.environ["ALLOW_DEV_OTP"] = "true"  # tests read dev_otp from the OTP response
 os.environ["USE_REAL_AI"] = "false"
 
 import pytest  # noqa: E402

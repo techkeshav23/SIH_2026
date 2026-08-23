@@ -18,12 +18,11 @@ dependencies:
   # networking
   dio: ^5.7.0
 
+  # Indian number/currency formatting (₹ with lakh/crore grouping)
+  intl: ^0.20.2
+
   # media capture
   image_picker: ^1.1.2
-  # NOTE: in-app voice recording temporarily removed — the `record` package's
-  # federated linux impl (record_linux 0.7.2) is source-incompatible with
-  # record_platform_interface 1.6.0 and breaks the release compile. The backend
-  # voice endpoint stays; re-add a compatible recorder to restore mic capture.
 
   # local storage (offline drafts)
   shared_preferences: ^2.3.3
@@ -31,6 +30,7 @@ dependencies:
 
   # accessibility — read screens aloud (low-literacy support)
   flutter_tts: ^4.2.0
+  record: ^6.2.1
 
 dev_dependencies:
   flutter_test:
@@ -42,7 +42,23 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icon/logo.png
+    - assets/hero.jpg
     - assets/demo/
+  fonts:
+    # Mukta (Ek Type) — one family for Latin + Devanagari so Hindi and English
+    # feel like the same app. Replaces the default Roboto.
+    - family: Mukta
+      fonts:
+        - asset: assets/fonts/Mukta-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Mukta-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Mukta-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Mukta-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Mukta-ExtraBold.ttf
+          weight: 800
 
 flutter_launcher_icons:
   android: true

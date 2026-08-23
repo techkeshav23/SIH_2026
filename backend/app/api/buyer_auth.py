@@ -39,7 +39,7 @@ def request_otp(
     from app.services import sms
 
     sms.send_otp(body.phone, otp)
-    dev_otp = otp if settings.is_dev and settings.sms_provider == "console" else None
+    dev_otp = otp if settings.allow_dev_otp else None
     return OtpSent(sent=True, dev_otp=dev_otp)
 
 

@@ -38,5 +38,17 @@ Thumbs.db
 uploads/
 *.local
 
-# build logs
-app/*.log
+# build / deploy logs
+*.log
+
+# secrets (NEVER commit)
+backend/.secret.txt
+backend/.dbpw.txt
+.api_url.txt
+
+# release binaries (distribute via GitHub Releases, not git)
+*.apk
+*.aab
+
+# archives
+*.zip

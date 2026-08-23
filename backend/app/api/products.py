@@ -26,6 +26,8 @@ def list_products(
     stmt = select(Product).where(Product.user_id == user.id)
     if status_filter:
         stmt = stmt.where(Product.status == status_filter)
+    else:
+        stmt = stmt.where(Product.status != "archived")  # hide deleted products
     return list(db.scalars(stmt.order_by(Product.created_at.desc())))
 
 
@@ -72,3 +74,16 @@ def update_product(
         ondc.publish_product(p)
 
     return p
+
+
+@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_product(
+    product_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Soft-delete: archive the product so it leaves listings/feed while any
+    existing orders keep their reference (no dangling FK, order history intact)."""
+    p = _owned(db, user, product_id)
+    p.status = "archived"
+    db.commit()

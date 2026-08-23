@@ -1,4 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required for the release build to reach the backend API (debug builds get
+         this automatically; release uses only this manifest). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- In-app voice cataloging (record package) records the artisan's spoken description. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <application
         android:label="KalaSetu"
         android:name="${applicationName}"

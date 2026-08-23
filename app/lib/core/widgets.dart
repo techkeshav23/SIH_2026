@@ -27,13 +27,17 @@ Future<bool> confirmDialog(
   String confirm = 'Confirm',
   bool danger = false,
 }) async {
+  final lang = ProviderScope.containerOf(context).read(langProvider);
   final ok = await showDialog<bool>(
     context: context,
     builder: (c) => AlertDialog(
       title: Text(title),
       content: Text(message),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () => Navigator.pop(c, false),
+          child: Text(T.of(context, lang, 'cancel')),
+        ),
         FilledButton(
           onPressed: () => Navigator.pop(c, true),
           style: danger ? FilledButton.styleFrom(backgroundColor: AppColors.danger) : null,
@@ -96,7 +100,9 @@ class KStatusPill extends ConsumerWidget {
   }
 }
 
-/// Gradient hero header with rounded bottom — used at the top of key screens.
+/// Flat, dense app header — dark title on the cream canvas with a hairline
+/// divider (real-app chrome, not a gradient hero). [gradient] is accepted for
+/// backwards-compatibility but ignored.
 class KHeader extends StatelessWidget {
   const KHeader({
     super.key,
@@ -104,43 +110,39 @@ class KHeader extends StatelessWidget {
     this.subtitle,
     this.trailing,
     this.leading,
-    this.gradient = Decor.heroGradient,
+    this.gradient,
   });
   final String title;
   final String? subtitle;
   final Widget? trailing;
   final Widget? leading;
-  final Gradient gradient;
+  final Gradient? gradient;
 
   @override
   Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 18, 20, 24),
-      decoration: BoxDecoration(
-        gradient: gradient,
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(Radii.xl)),
-        boxShadow: Decor.lift,
+      padding: EdgeInsets.fromLTRB(6, MediaQuery.of(context).padding.top + 8, 10, 10),
+      decoration: const BoxDecoration(
+        color: AppColors.bg,
+        border: Border(bottom: BorderSide(color: AppColors.line)),
       ),
       child: Row(
         children: [
-          if (leading != null) ...[leading!, const SizedBox(width: 12)],
+          ?leading,
+          const SizedBox(width: 4),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.4)),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 4),
-                  Text(subtitle!, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14)),
-                ],
+                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.headlineSmall),
+                if (subtitle != null)
+                  Text(subtitle!, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.bodyMedium),
               ],
             ),
           ),
-          if (trailing != null) Flexible(child: trailing!),
+          ?trailing,
         ],
       ),
     );
@@ -158,29 +160,35 @@ class KNetImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ph = Container(
-      width: width, height: height, color: AppColors.surfaceAlt,
-      child: const Center(child: Icon(Icons.image_outlined, color: AppColors.muted)),
+    final ph = ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: Container(
+        width: width, height: height, color: AppColors.surfaceAlt,
+        child: const Center(child: Icon(Icons.image_outlined, color: AppColors.muted)),
+      ),
     );
+    final u = url?.trim();
+    if (u == null || u.isEmpty) return ph;
     // demo images are bundled assets ("asset:<path>")
-    if (url != null && url!.startsWith('asset:')) {
+    if (u.startsWith('asset:')) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(radius),
-        child: Image.asset(url!.substring(6), width: width, height: height, fit: fit,
+        child: Image.asset(u.substring(6), width: width, height: height, fit: fit,
             errorBuilder: (_, _, _) => ph),
       );
     }
+    // only attempt a network load for a real http(s) url; anything else -> placeholder
+    final uri = Uri.tryParse(u);
+    if (uri == null || !(uri.scheme == 'http' || uri.scheme == 'https')) return ph;
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
-      child: url == null
-          ? ph
-          : Image.network(url!, width: width, height: height, fit: fit,
-              errorBuilder: (_, _, _) => ph,
-              loadingBuilder: (c, child, p) => p == null
-                  ? child
-                  : Container(width: width, height: height, color: AppColors.surfaceAlt,
-                      child: const Center(
-                          child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))))),
+      child: Image.network(u, width: width, height: height, fit: fit,
+          errorBuilder: (_, _, _) => ph,
+          loadingBuilder: (c, child, p) => p == null
+              ? child
+              : Container(width: width, height: height, color: AppColors.surfaceAlt,
+                  child: const Center(
+                      child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))))),
     );
   }
 }

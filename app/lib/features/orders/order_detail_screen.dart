@@ -1,15 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/format.dart';
 import '../../core/l10n.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
+import '../../data/api.dart';
 import '../../data/models.dart';
 
-/// Order detail with a vertical status timeline. Order is passed via route extra.
-class OrderDetailScreen extends ConsumerWidget {
+/// Order detail with a vertical status timeline + role-aware fulfilment actions.
+/// Order is passed via route extra.
+class OrderDetailScreen extends ConsumerStatefulWidget {
   const OrderDetailScreen({super.key, required this.order});
   final Order order;
+
+  @override
+  ConsumerState<OrderDetailScreen> createState() => _OrderDetailScreenState();
+}
+
+class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
+  late Order _order = widget.order;
+  bool _busy = false;
 
   static const _flow = ['pending', 'accepted', 'paid', 'shipped', 'completed'];
   static const _labels = {
@@ -20,17 +31,40 @@ class OrderDetailScreen extends ConsumerWidget {
     'completed': ['Delivered', 'पहुँच गया'],
   };
 
+  Api get _api => ref.read(apiProvider);
+
+  Future<void> _run(Future<Order> Function() action, String okKey) async {
+    final lang = ref.read(langProvider);
+    setState(() => _busy = true);
+    try {
+      final updated = await action();
+      setState(() => _order = updated);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(T.of(context, lang, okKey))));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(T.of(context, lang, 'action_failed'))));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final lang = ref.watch(langProvider);
     final hi = lang == AppLang.hi;
     String t(String k) => T.of(context, lang, k);
 
+    final order = _order;
     final terminated = order.status == 'rejected' || order.status == 'cancelled';
     final currentIdx = _flow.indexOf(order.status);
 
     return Scaffold(
-      appBar: AppBar(title: Text('${t('order_no')} #${order.id.substring(0, 6).toUpperCase()}')),
+      appBar: AppBar(title: Text('${t('order_no')} #${order.shortId.toUpperCase()}')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -46,11 +80,11 @@ class OrderDetailScreen extends ConsumerWidget {
                         maxLines: 2, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 4),
                   ],
-                  Text('${t('qty')}: ${order.quantity} × ₹${order.unitPrice.toStringAsFixed(0)}',
+                  Text('${t('qty')}: ${order.quantity} × ${rupees(order.unitPrice)}',
                       style: Theme.of(context).textTheme.bodyMedium),
                   const SizedBox(height: 2),
-                  Text('₹${order.totalPrice.toStringAsFixed(0)}',
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 22, color: AppColors.success)),
+                  Text(rupees(order.totalPrice),
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 22, color: AppColors.text)),
                 ]),
               ),
               Gap.m,
@@ -63,6 +97,21 @@ class OrderDetailScreen extends ConsumerWidget {
               const Icon(Icons.sticky_note_2_outlined, color: AppColors.muted),
               Gap.m,
               Expanded(child: Text(order.note!, style: Theme.of(context).textTheme.bodyMedium)),
+            ])),
+          ],
+          if ((order.shipAddress ?? '').isNotEmpty) ...[
+            Gap.m,
+            KCard(child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Icon(Icons.local_shipping_outlined, color: AppColors.primary),
+              Gap.m,
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('${t('ship_to')}: ${order.shipName ?? ''}',
+                    style: Theme.of(context).textTheme.titleSmall),
+                if ((order.shipPhone ?? '').isNotEmpty)
+                  Text(order.shipPhone!, style: Theme.of(context).textTheme.bodySmall),
+                const SizedBox(height: 2),
+                Text(order.shipAddress!, style: Theme.of(context).textTheme.bodyMedium),
+              ])),
             ])),
           ],
           Gap.l,
@@ -89,9 +138,52 @@ class OrderDetailScreen extends ConsumerWidget {
                 ],
               ),
             ),
+          ..._actions(t),
         ],
       ),
     );
+  }
+
+  /// Role- and status-aware fulfilment buttons.
+  List<Widget> _actions(String Function(String) t) {
+    final s = _order.status;
+    final isBuyer = _api.isBuyer;
+    final buttons = <Widget>[];
+
+    // Artisan dispatches a paid order.
+    if (!isBuyer && s == 'paid') {
+      buttons.add(FilledButton.icon(
+        onPressed: _busy ? null : () => _run(() => _api.shipOrder(_order.id), 'order_shipped_ok'),
+        icon: const Icon(Icons.local_shipping_rounded),
+        label: Text(t('mark_shipped')),
+      ));
+    }
+    // Buyer confirms receipt of a shipped order.
+    if (isBuyer && s == 'shipped') {
+      buttons.add(FilledButton.icon(
+        onPressed: _busy ? null : () => _run(() => _api.confirmDelivery(_order.id), 'delivery_confirmed'),
+        icon: const Icon(Icons.check_circle_rounded),
+        label: Text(t('confirm_received')),
+      ));
+    }
+    // Buyer cancels an order that isn't paid yet.
+    if (isBuyer && (s == 'pending' || s == 'accepted')) {
+      buttons.add(OutlinedButton.icon(
+        onPressed: _busy
+            ? null
+            : () async {
+                final ok = await confirmDialog(context,
+                    title: t('cancel_order_q'), message: t('cancel_order_msg'),
+                    confirm: t('cancel_order'), danger: true);
+                if (ok) await _run(() => _api.cancelOrder(_order.id), 'order_cancelled_ok');
+              },
+        icon: const Icon(Icons.cancel_outlined, color: AppColors.danger),
+        label: Text(t('cancel_order'), style: const TextStyle(color: AppColors.danger)),
+      ));
+    }
+
+    if (buttons.isEmpty) return [];
+    return [Gap.l, ...buttons.expand((b) => [b, Gap.s])];
   }
 }
 

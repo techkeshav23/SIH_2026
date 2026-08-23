@@ -26,6 +26,11 @@ class UserOut(BaseModel):
     language_pref: str = "hi"
     craft_type: str | None = None
     region: str | None = None
+    consent_version: str | None = None
+
+
+class ConsentIn(BaseModel):
+    version: str
 
 
 class UserUpdate(BaseModel):
@@ -162,6 +167,7 @@ class BuyerOut(BaseModel):
     org_name: str | None = None
     gstin: str | None = None
     type: str = "B2B"
+    consent_version: str | None = None
 
 
 class BuyerUpdate(BaseModel):
@@ -178,11 +184,37 @@ class BuyerAuthToken(BaseModel):
     buyer: BuyerOut
 
 
+# ---- Addresses ----
+class AddressCreate(BaseModel):
+    name: str
+    phone: str
+    line1: str
+    line2: str | None = None
+    city: str
+    state: str
+    pincode: str
+    is_default: bool = False
+
+
+class AddressOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    name: str
+    phone: str
+    line1: str
+    line2: str | None = None
+    city: str
+    state: str
+    pincode: str
+    is_default: bool
+
+
 # ---- Orders ----
 class OrderCreate(BaseModel):
     product_id: str
     quantity: int = 1
     note: str | None = None
+    address_id: str | None = None
 
 
 class OrderOut(BaseModel):
@@ -196,6 +228,9 @@ class OrderOut(BaseModel):
     total_price: float
     status: str
     note: str | None = None
+    ship_name: str | None = None
+    ship_phone: str | None = None
+    ship_address: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -215,6 +250,69 @@ class PaymentCheckout(BaseModel):
 class PaymentConfirm(BaseModel):
     provider_payment_id: str | None = None
     signature: str | None = None
+
+
+# ---- Reviews ----
+class ReviewCreate(BaseModel):
+    rating: int
+    text: str | None = None
+
+
+class ReviewOut(BaseModel):
+    id: str
+    product_id: str
+    author: str
+    rating: int
+    text: str | None = None
+    date: datetime | None = None
+
+
+# ---- Notifications ----
+class NotificationOut(BaseModel):
+    id: str
+    title: str
+    body: str | None = None
+    type: str
+    read: bool
+    time: datetime | None = None
+
+
+# ---- Quotes (B2B RFQ / negotiation) ----
+class QuoteCreate(BaseModel):
+    product_id: str
+    quantity: int
+    target_price: float          # buyer's per-unit offer
+    message: str | None = None
+
+
+class QuotePrice(BaseModel):
+    price: float                 # per-unit counter offer
+
+
+class QuoteOut(BaseModel):
+    id: str
+    product_id: str
+    product_title: str | None = None
+    product_image: str | None = None
+    quantity: int
+    buyer_price: float
+    artisan_price: float | None = None
+    agreed_price: float | None = None
+    list_price: float | None = None
+    status: str
+    turn: str
+    message: str | None = None
+    order_id: str | None = None
+    created_at: datetime
+
+
+# ---- Storefront ----
+class StorefrontOut(BaseModel):
+    artisan_id: str
+    name: str | None = None
+    craft_type: str | None = None
+    region: str | None = None
+    products: list[ProductOut] = []
 
 
 # ---- Dashboard ----

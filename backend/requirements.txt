@@ -23,9 +23,14 @@ psycopg[binary]==3.2.3            # Postgres driver (prod)
 # API. Vertex auth uses google-auth (bundled). Voice cataloging (F2) + pricing (F3).
 google-genai==1.9.0
 
-# Image background removal (F1) — optional, heavier (onnxruntime + model download).
-# Enable with USE_REMBG=true after installing. Default path uses Pillow (no key/deps).
-# rembg==2.0.61
+# Durable product-image storage (Cloud Run disk is ephemeral).
+google-cloud-storage==2.18.2
+
+# Image background removal (F1) — true U2-Net cutout. Uses the lightweight
+# u2netp model (~4.7MB, baked into the image). Enable with USE_REMBG=true.
+# Falls back to Pillow automatically if inference fails (see image_ai.enhance).
+rembg==2.0.61
+onnxruntime==1.20.1
 
 # ---- observability ----
 sentry-sdk[fastapi]==2.19.2

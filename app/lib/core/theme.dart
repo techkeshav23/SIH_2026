@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// KalaSetu design system — "warm artisan craft": terracotta + haldi on a warm
 /// cream canvas, indigo pops, soft tactile surfaces. Built for accessibility:
@@ -31,10 +32,11 @@ class Gap {
 }
 
 class Radii {
-  static const sm = 12.0;
-  static const md = 16.0;
-  static const lg = 22.0;
-  static const xl = 30.0;
+  // Commerce-grade radii (Meesho/IndiaMART ~8-14px) — crisp, not bubbly.
+  static const sm = 8.0;
+  static const md = 10.0;
+  static const lg = 14.0;
+  static const xl = 18.0;
   static const pill = 999.0;
 }
 
@@ -81,7 +83,7 @@ class AppTheme {
       brightness: Brightness.light,
     );
 
-    const font = 'Roboto';
+    const font = 'Mukta';  // one Devanagari-aware family for Hindi + English
     final text = _textTheme();
 
     return ThemeData(
@@ -98,11 +100,16 @@ class AppTheme {
         foregroundColor: AppColors.text,
         elevation: 0,
         centerTitle: false,
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.light,
+        ),
         titleTextStyle: TextStyle(
+          fontFamily: 'Mukta',
           color: AppColors.text,
-          fontSize: 22,
+          fontSize: 21,
           fontWeight: FontWeight.w700,
-          letterSpacing: -0.3,
         ),
       ),
 
@@ -196,12 +203,14 @@ class AppTheme {
 
   static TextTheme _textTheme() {
     const c = AppColors.text;
+    // Flatter weight ladder; near-zero tracking so the Devanagari shirorekha
+    // isn't crushed. w800 is reserved for prices/CTAs at the call site.
     return const TextTheme(
-      displaySmall: TextStyle(color: c, fontSize: 32, fontWeight: FontWeight.w800, letterSpacing: -0.8, height: 1.1),
-      headlineMedium: TextStyle(color: c, fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5),
-      headlineSmall: TextStyle(color: c, fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.3),
-      titleLarge: TextStyle(color: c, fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -0.2),
-      titleMedium: TextStyle(color: c, fontSize: 16, fontWeight: FontWeight.w600),
+      displaySmall: TextStyle(color: c, fontSize: 30, fontWeight: FontWeight.w700, letterSpacing: 0, height: 1.15),
+      headlineMedium: TextStyle(color: c, fontSize: 25, fontWeight: FontWeight.w700, letterSpacing: -0.1),
+      headlineSmall: TextStyle(color: c, fontSize: 21, fontWeight: FontWeight.w700, letterSpacing: 0),
+      titleLarge: TextStyle(color: c, fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: 0),
+      titleMedium: TextStyle(color: c, fontSize: 16, fontWeight: FontWeight.w500),
       bodyLarge: TextStyle(color: AppColors.textSoft, fontSize: 15.5, height: 1.45),
       bodyMedium: TextStyle(color: AppColors.textSoft, fontSize: 14, height: 1.45),
       labelLarge: TextStyle(color: c, fontSize: 14, fontWeight: FontWeight.w600),

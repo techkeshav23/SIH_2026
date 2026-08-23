@@ -24,6 +24,9 @@ class User(Base):
     language_pref: Mapped[str] = mapped_column(String, default="hi")
     craft_type: Mapped[str | None] = mapped_column(String, nullable=True)
     region: Mapped[str | None] = mapped_column(String, nullable=True)
+    # DPDP Act 2023 consent audit trail
+    consent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    consent_version: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     products: Mapped[list["Product"]] = relationship(back_populates="user")
@@ -89,6 +92,25 @@ class Buyer(Base):
     org_name: Mapped[str | None] = mapped_column(String, nullable=True)
     gstin: Mapped[str | None] = mapped_column(String, nullable=True)
     type: Mapped[str] = mapped_column(String, default="B2B")  # GeM|B2B|retail
+    # DPDP Act 2023 consent audit trail
+    consent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    consent_version: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class Address(Base):
+    __tablename__ = "addresses"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    buyer_id: Mapped[str] = mapped_column(ForeignKey("buyers.id"), index=True)
+    name: Mapped[str] = mapped_column(String)
+    phone: Mapped[str] = mapped_column(String)
+    line1: Mapped[str] = mapped_column(String)
+    line2: Mapped[str | None] = mapped_column(String, nullable=True)
+    city: Mapped[str] = mapped_column(String)
+    state: Mapped[str] = mapped_column(String)
+    pincode: Mapped[str] = mapped_column(String)
+    is_default: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
 
@@ -103,6 +125,12 @@ class Order(Base):
     quantity: Mapped[int] = mapped_column(Integer, default=1)
     unit_price: Mapped[float] = mapped_column(Float)
     total_price: Mapped[float] = mapped_column(Float)
+
+    # Denormalized shipping snapshot — kept even if the buyer edits/deletes the
+    # saved address later, so the artisan always sees where to dispatch.
+    ship_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    ship_phone: Mapped[str | None] = mapped_column(String, nullable=True)
+    ship_address: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # pending -> accepted/rejected -> paid -> shipped -> completed | cancelled
     status: Mapped[str] = mapped_column(String, default="pending", index=True)
@@ -135,3 +163,59 @@ class Inquiry(Base):
     message: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String, default="new")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class Review(Base):
+    __tablename__ = "reviews"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    product_id: Mapped[str] = mapped_column(ForeignKey("products.id"), index=True)
+    buyer_id: Mapped[str | None] = mapped_column(ForeignKey("buyers.id"), nullable=True, index=True)
+    author_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    rating: Mapped[int] = mapped_column(Integer, default=5)
+    text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class Quote(Base):
+    """B2B bulk-order price negotiation (RFQ). A buyer requests a quote for a
+    quantity at a target unit price; the artisan counters/accepts; either side
+    can keep countering until one accepts (-> becomes an Order) or declines."""
+
+    __tablename__ = "quotes"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    product_id: Mapped[str] = mapped_column(ForeignKey("products.id"), index=True)
+    buyer_id: Mapped[str] = mapped_column(ForeignKey("buyers.id"), index=True)
+    artisan_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+
+    quantity: Mapped[int] = mapped_column(Integer, default=1)
+    buyer_price: Mapped[float] = mapped_column(Float)                 # buyer's current per-unit offer
+    artisan_price: Mapped[float | None] = mapped_column(Float, nullable=True)  # artisan's current counter
+    agreed_price: Mapped[float | None] = mapped_column(Float, nullable=True)   # set on accept
+    list_price: Mapped[float | None] = mapped_column(Float, nullable=True)     # product price at request time
+
+    # open (awaiting `turn`) | accepted | declined
+    status: Mapped[str] = mapped_column(String, default="open", index=True)
+    turn: Mapped[str] = mapped_column(String, default="artisan")      # who must respond next
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    order_id: Mapped[str | None] = mapped_column(String, nullable=True)  # set when accepted -> order
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+
+class Notification(Base):
+    """A per-recipient alert. recipient_id/role stay generic so both artisans
+    (users) and buyers can receive notifications without a rigid FK."""
+
+    __tablename__ = "notifications"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    recipient_id: Mapped[str] = mapped_column(String, index=True)
+    recipient_role: Mapped[str] = mapped_column(String, default="artisan")  # artisan|buyer
+    kind: Mapped[str] = mapped_column(String, default="info")  # order|review|inquiry|info
+    title: Mapped[str] = mapped_column(String)
+    body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    read: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now, index=True)

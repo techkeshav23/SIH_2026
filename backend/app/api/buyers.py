@@ -3,8 +3,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.models import Inquiry, Product
-from app.models.schemas import InquiryCreate, InquiryOut, ProductOut
+from app.models import Inquiry, Product, User
+from app.models.schemas import InquiryCreate, InquiryOut, ProductOut, StorefrontOut
 
 router = APIRouter(prefix="/buyers", tags=["buyers"])
 
@@ -16,6 +16,23 @@ def feed(category: str | None = None, db: Session = Depends(get_db)):
     if category:
         stmt = stmt.where(Product.category == category)
     return list(db.scalars(stmt.order_by(Product.updated_at.desc())))
+
+
+@router.get("/storefront/{artisan_id}", response_model=StorefrontOut)
+def storefront(artisan_id: str, db: Session = Depends(get_db)):
+    """Public artisan shop page — bio + their listed products."""
+    artisan = db.get(User, artisan_id)
+    if not artisan:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Artisan not found")
+    products = db.scalars(
+        select(Product)
+        .where(Product.user_id == artisan_id, Product.status == "listed")
+        .order_by(Product.updated_at.desc())
+    ).all()
+    return StorefrontOut(
+        artisan_id=artisan.id, name=artisan.name, craft_type=artisan.craft_type,
+        region=artisan.region, products=list(products),
+    )
 
 
 @router.post("/inquiries", response_model=InquiryOut, status_code=status.HTTP_201_CREATED)

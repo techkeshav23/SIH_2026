@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/format.dart';
 import '../../core/l10n.dart';
 import '../../core/nav.dart';
 import '../../core/theme.dart';
@@ -25,14 +26,14 @@ class OrdersScreen extends ConsumerWidget {
     final title = T.of(context, lang, 'incoming_orders');
     final subtitle = T.of(context, lang, 'incoming_sub');
     return AppScaffold(
-      current: 1,
+      current: 2,
       body: Column(
         children: [
           KHeader(
             title: title,
             subtitle: subtitle,
             leading: drawerButton(),
-            trailing: KSpeak('$title — $subtitle', color: Colors.white),
+            trailing: KSpeak('$title — $subtitle'),
           ),
           Expanded(
             child: orders.when(
@@ -105,11 +106,11 @@ class _OrderCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(order.productTitle ?? '${t('order_no')} #${order.id.substring(0, 6)}',
+                    Text(order.productTitle ?? '${t('order_no')} #${order.shortId}',
                         style: Theme.of(context).textTheme.titleMedium,
                         maxLines: 1, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 2),
-                    Text('${t('order_no')} #${order.id.substring(0, 6)}',
+                    Text('${t('order_no')} #${order.shortId}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.muted)),
                   ],
                 ),
@@ -123,14 +124,13 @@ class _OrderCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('${t('qty')}: ${order.quantity} × ₹${order.unitPrice.toStringAsFixed(0)}',
+              Text('${t('qty')}: ${order.quantity} × ${rupees(order.unitPrice)}',
                   style: Theme.of(context).textTheme.bodyMedium),
-              Text('₹${order.totalPrice.toStringAsFixed(0)}',
+              Text(rupees(order.totalPrice),
                   style: const TextStyle(
                     fontWeight: FontWeight.w800,
-                    color: AppColors.success,
+                    color: AppColors.text,
                     fontSize: 22,
-                    letterSpacing: -0.5,
                   )),
             ],
           ),

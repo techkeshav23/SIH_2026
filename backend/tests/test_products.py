@@ -33,3 +33,21 @@ def test_status_filter(client, auth):
     client.patch(f"/products/{a['id']}", headers=auth, json={"status": "listed"})
     listed = client.get("/products?status_filter=listed", headers=auth).json()
     assert all(i["status"] == "listed" for i in listed)
+
+
+def test_delete_archives_and_hides(client, auth):
+    p = _create(client, auth, category="lamp", material="brass")
+    client.patch(f"/products/{p['id']}", headers=auth, json={"status": "listed", "final_price": 300})
+    assert any(i["id"] == p["id"] for i in client.get("/products", headers=auth).json())
+
+    assert client.delete(f"/products/{p['id']}", headers=auth).status_code == 204
+    # hidden from the default list...
+    assert not any(i["id"] == p["id"] for i in client.get("/products", headers=auth).json())
+    # ...but still fetchable (order history intact), now archived
+    assert client.get(f"/products/{p['id']}", headers=auth).json()["status"] == "archived"
+
+
+def test_delete_requires_ownership(client, auth, tokens):
+    p = _create(client, auth, category="rug", material="wool")
+    other = {"Authorization": f"Bearer {tokens['access_token']}"}
+    assert client.delete(f"/products/{p['id']}", headers=other).status_code == 404

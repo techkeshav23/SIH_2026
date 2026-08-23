@@ -46,7 +46,7 @@ class Demo {
   /// own "My Orders" starts empty and fills as they place orders (buyer_id 'me').
   static final List<Map<String, dynamic>> orders = [
     // buyer's OWN orders ('me') — populate the buyer's "My Orders" + show Pay-now
-    _o('o1', 'd1', 'Banarasi Silk Saree', 'saree', 4, 2800, 'paid', 'me'),
+    _o('o1', 'd1', 'Banarasi Silk Saree', 'saree', 4, 2800, 'shipped', 'me'),
     _o('o4', 'd2', 'Blue Pottery Vase', 'pottery', 8, 750, 'accepted', 'me'),
     _o('o5', 'd4', 'Pattachitra Painting', 'painting', 3, 2200, 'pending', 'me'),
     // other buyers — artisan's incoming queue
@@ -74,7 +74,7 @@ class Demo {
       {'items': products.where((p) => p['status'] == 'listed').toList()};
 
   static Map<String, dynamic> newProduct(String? category, String? material) {
-    final p = _p('d${products.length + 1}', 'New Handmade Product', 'नया हस्तनिर्मित उत्पाद',
+    final p = _p('d${_seq++}', 'New Handmade Product', 'नया हस्तनिर्मित उत्पाद',
         category ?? 'Handicraft', material ?? 'Handmade', 'sample_enhanced',
         ['handmade'], 'draft', 0, 0, null, '', '');
     p['raw_image_url'] = null;
@@ -90,8 +90,19 @@ class Demo {
     return null;
   }
 
+  // Monotonic id source so ids never collide after deletes (length-based ids do).
+  static int _seq = 100;
+
+  static Map<String, dynamic> _stub() => _p('d${_seq++}', 'Product', 'उत्पाद',
+      'Handicraft', 'Handmade', 'sample_enhanced', const ['handmade'], 'draft', 0, 0, null, '', '');
+
+  /// byId, or the first product, or a throwaway stub if the list is empty
+  /// (avoids 'Bad state: No element' after every product is deleted).
+  static Map<String, dynamic> _findOrStub(String id) =>
+      byId(id) ?? (products.isNotEmpty ? products.first : _stub());
+
   static Map<String, dynamic> catalog(String id, String text) {
-    final p = byId(id) ?? products.first;
+    final p = _findOrStub(id);
     final cat = p['category'] == 'Handicraft' ? 'Handmade Craft' : p['category'];
     p['title_en'] = 'Handcrafted $cat — Artisan Made';
     p['title_hi'] = 'हस्तनिर्मित $cat — कारीगर द्वारा';
@@ -105,7 +116,7 @@ class Demo {
   }
 
   static Map<String, dynamic> price(String id) {
-    final p = byId(id) ?? products.first;
+    final p = _findOrStub(id);
     final base = (p['suggested_price_max'] as num?)?.toDouble() ?? 900;
     final lo = (base * 0.85).roundToDouble();
     final hi = (base * 1.1).roundToDouble();
@@ -128,7 +139,7 @@ class Demo {
   }
 
   static Map<String, dynamic> enhance(String id) {
-    final p = byId(id) ?? products.first;
+    final p = _findOrStub(id);
     p['raw_image_url'] = sampleRaw;
     p['enhanced_image_url'] = sampleEnhanced;
     p['status'] = 'ready';
@@ -136,15 +147,17 @@ class Demo {
   }
 
   static Map<String, dynamic> update(String id, Map<String, dynamic> patch) {
-    final p = byId(id) ?? products.first;
+    final p = _findOrStub(id);
     p.addAll(patch);
     return p;
   }
 
+  static void deleteProduct(String id) => products.removeWhere((p) => p['id'] == id);
+
   static Map<String, dynamic> placeOrder(String productId, int qty) {
-    final p = byId(productId) ?? products.first;
+    final p = _findOrStub(productId);
     final unit = (p['final_price'] ?? p['suggested_price_max'] ?? 0) as num;
-    final o = _o('o${orders.length + 1}', productId, p['title_en'] ?? 'Product',
+    final o = _o('o${_seq++}', productId, p['title_en'] ?? 'Product',
         p['image'] ?? 'saree', qty, unit, 'pending', 'me');
     orders.insert(0, o);
     return o;
@@ -157,7 +170,9 @@ class Demo {
         return o;
       }
     }
-    return orders.first;
+    return orders.isNotEmpty
+        ? orders.first
+        : {'id': id, 'status': status, 'quantity': 1, 'unit_price': 0, 'total_price': 0};
   }
 
   // ---- reviews ----
@@ -216,6 +231,100 @@ class Demo {
     profile.addAll(patch);
     return profile;
   }
+
+  // ---- delivery addresses (buyer) ----
+  static final List<Map<String, dynamic>> addresses = [
+    {
+      'id': 'addr1', 'name': 'राधा शर्मा', 'phone': '9876500011',
+      'line1': '12, MG Road', 'line2': 'Near City Mall',
+      'city': 'जयपुर', 'state': 'राजस्थान', 'pincode': '302001', 'is_default': true,
+    },
+  ];
+
+  static Map<String, dynamic> addAddress(Map<String, dynamic> body) {
+    final isFirst = addresses.isEmpty;
+    if (body['is_default'] == true || isFirst) {
+      for (final a in addresses) {
+        a['is_default'] = false;
+      }
+    }
+    final a = {
+      ...body,
+      'id': 'addr${addresses.length + 1}',
+      'is_default': body['is_default'] == true || isFirst,
+    };
+    addresses.add(a);
+    return a;
+  }
+
+  static void deleteAddress(String id) => addresses.removeWhere((a) => a['id'] == id);
+
+  // ---- B2B quotes / negotiation ----
+  static final List<Map<String, dynamic>> quotes = [
+    {
+      'id': 'q1', 'product_id': 'd3', 'product_title': 'Pashmina Shawl',
+      'product_image': _img('shawl'), 'quantity': 50, 'buyer_price': 4200,
+      'artisan_price': 4800, 'agreed_price': null, 'list_price': 5200,
+      'status': 'open', 'turn': 'buyer', 'message': 'Bulk order for our export house',
+      'order_id': null,
+    },
+  ];
+
+  static Map<String, dynamic> createQuote(String pid, int qty, double target, String? msg) {
+    final p = _findOrStub(pid);
+    final q = {
+      'id': 'q${_seq++}', 'product_id': pid, 'product_title': p['title_en'] ?? 'Product',
+      'product_image': p['image'] != null ? _img(p['image']) : null,
+      'quantity': qty, 'buyer_price': target, 'artisan_price': null, 'agreed_price': null,
+      'list_price': p['final_price'] ?? p['suggested_price_max'], 'status': 'open',
+      'turn': 'artisan', 'message': msg, 'order_id': null,
+    };
+    quotes.insert(0, q);
+    return q;
+  }
+
+  static Map<String, dynamic> quoteAction(String id, String action, {double? price, bool byBuyer = false}) {
+    final q = quotes.firstWhere((x) => x['id'] == id,
+        orElse: () => quotes.isNotEmpty ? quotes.first : {'id': id, 'status': 'open', 'turn': 'artisan'});
+    // parity with the backend state machine: only the party whose turn it is,
+    // and only while still open, may act.
+    final role = byBuyer ? 'buyer' : 'artisan';
+    if (q['status'] != 'open' || q['turn'] != role) return q;
+
+    if (action == 'counter') {
+      if (price == null || price <= 0) return q;
+      if (byBuyer) {
+        q['buyer_price'] = price;
+        q['turn'] = 'artisan';
+      } else {
+        q['artisan_price'] = price;
+        q['turn'] = 'buyer';
+      }
+    } else if (action == 'accept') {
+      final agreed = byBuyer ? q['artisan_price'] : q['buyer_price'];
+      if (agreed == null) return q; // nothing to accept yet
+      q['agreed_price'] = agreed;
+      q['status'] = 'accepted';
+      // spawn a real demo order so the deal shows up in My Orders
+      final p = _findOrStub(q['product_id']?.toString() ?? '');
+      final o = _o('o${_seq++}', q['product_id'] ?? '', q['product_title'] ?? 'Product',
+          p['image'] ?? 'saree', (q['quantity'] ?? 1) as int, agreed as num, 'accepted', 'me');
+      orders.insert(0, o);
+      q['order_id'] = o['id'];
+    } else if (action == 'decline') {
+      q['status'] = 'declined';
+    }
+    return q;
+  }
+
+  // ---- artisan storefront (public) ----
+  static Map<String, dynamic> storefront() => {
+        'artisan_id': 'demo',
+        'name': profile['name'],
+        'craft_type': profile['craft_type'],
+        'region': profile['region'],
+        'products': (listed()['items'] as List),
+      };
 
   // ---- builders ----
   static Map<String, dynamic> _p(String id, String en, String hi, String cat, String mat,

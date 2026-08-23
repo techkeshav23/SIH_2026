@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/format.dart';
 import '../../core/l10n.dart';
 import '../../core/theme.dart';
 import '../../core/tts.dart';
@@ -27,11 +29,11 @@ class BuyerProductScreen extends ConsumerWidget {
     String t(String k) => T.of(context, lang, k);
     final api = ref.read(apiProvider);
     final price = product.finalPrice ?? product.suggestedPriceMax;
-    final title = (hi ? product.titleHi : product.titleEn) ?? product.titleEn ?? product.titleHi ?? 'Product';
-    final desc = (hi ? product.descHi : product.descEn) ?? product.descEn ?? product.descHi ?? '';
+    final title = product.titleFor(hi) ?? 'Product';
+    final desc = product.descFor(hi) ?? '';
 
     return Scaffold(
-      appBar: AppBar(actions: [KSpeak('$title. ${price != null ? '₹${price.toStringAsFixed(0)}' : ''}. $desc')]),
+      appBar: AppBar(actions: [KSpeak('$title. ${price != null ? rupees(price) : ''}. $desc')]),
       bottomNavigationBar: Container(
         padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
         decoration: const BoxDecoration(
@@ -56,7 +58,7 @@ class BuyerProductScreen extends ConsumerWidget {
             child: FilledButton.icon(
               onPressed: () => _order(context, ref, api, price ?? 0),
               icon: const Icon(Icons.shopping_bag_rounded),
-              label: Text('${t('order')}  ·  ₹${(price ?? 0).toStringAsFixed(0)}'),
+              label: Text('${t('order')}  ·  ${rupees(price ?? 0)}'),
             ),
           ),
         ]),
@@ -73,15 +75,23 @@ class BuyerProductScreen extends ConsumerWidget {
               Text(title, style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 6),
               if (price != null)
-                Text('₹${price.toStringAsFixed(0)}',
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 24, color: AppColors.success)),
+                Text(rupees(price),
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 24, color: AppColors.text)),
               Gap.m,
               if (product.category != null || product.material != null)
                 Row(children: [
                   const Icon(Icons.storefront_rounded, size: 18, color: AppColors.muted),
                   const SizedBox(width: 6),
-                  Text('${t('by_artisan')} · ${product.category ?? ''} ${product.material ?? ''}'.trim(),
-                      style: Theme.of(context).textTheme.bodyMedium),
+                  Expanded(
+                    child: Text('${t('by_artisan')} · ${product.category ?? ''} ${product.material ?? ''}'.trim(),
+                        style: Theme.of(context).textTheme.bodyMedium),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => context.push('/storefront/${product.userId}'),
+                    icon: const Icon(Icons.store_mall_directory_outlined, size: 16),
+                    label: Text(t('view_shop')),
+                    style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                  ),
                 ]),
               Gap.l,
               KSectionTitle(t('about_product')),
@@ -94,11 +104,87 @@ class BuyerProductScreen extends ConsumerWidget {
                 ]),
               ],
               Gap.l,
+              // B2B: negotiate a bulk price
+              OutlinedButton.icon(
+                onPressed: () => _requestQuote(context, ref, api, price ?? 0),
+                icon: const Icon(Icons.gavel_rounded, size: 18),
+                label: Text(t('bulk_quote')),
+              ),
+              Gap.l,
               _Reviews(productId: product.id),
               Gap.xl,
             ]),
           ),
         ],
+      ),
+    );
+  }
+
+  void _requestQuote(BuildContext context, WidgetRef ref, Api api, double listPrice) {
+    final qtyCtrl = TextEditingController(text: '50');
+    final priceCtrl = TextEditingController(
+        text: listPrice > 0 ? (listPrice * 0.8).round().toString() : '');
+    final msgCtrl = TextEditingController();
+    final lang = ref.read(langProvider);
+    String t(String k) => T.of(context, lang, k);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (c) => Padding(
+        padding: EdgeInsets.only(left: 20, right: 20, top: 20, bottom: MediaQuery.of(c).viewInsets.bottom + 24),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            const Icon(Icons.gavel_rounded, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Text(t('bulk_quote'), style: Theme.of(c).textTheme.titleLarge),
+          ]),
+          if (listPrice > 0) ...[
+            const SizedBox(height: 4),
+            Text('${t('list_price')}: ${rupees(listPrice)}${t('per_unit')}',
+                style: Theme.of(c).textTheme.labelSmall),
+          ],
+          Gap.m,
+          TextField(
+            controller: qtyCtrl,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: InputDecoration(labelText: t('quote_qty')),
+          ),
+          Gap.s,
+          TextField(
+            controller: priceCtrl,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: InputDecoration(labelText: t('your_price_unit'), prefixText: '₹ '),
+          ),
+          Gap.s,
+          TextField(
+            controller: msgCtrl,
+            maxLines: 2,
+            decoration: InputDecoration(labelText: t('message')),
+          ),
+          Gap.l,
+          FilledButton.icon(
+            onPressed: () async {
+              final qty = int.tryParse(qtyCtrl.text.trim()) ?? 0;
+              final price = double.tryParse(priceCtrl.text.trim()) ?? 0;
+              if (qty < 1 || price <= 0) return;
+              final nav = Navigator.of(c);
+              final messenger = ScaffoldMessenger.of(context);
+              try {
+                await api.createQuote(product.id, qty, price, message: msgCtrl.text.trim());
+                nav.pop();
+                messenger.showSnackBar(SnackBar(content: Text(t('quote_sent'))));
+                if (context.mounted) context.push('/quotes');
+              } catch (_) {
+                messenger.showSnackBar(SnackBar(content: Text(t('try_again'))));
+              }
+            },
+            icon: const Icon(Icons.send_rounded),
+            label: Text(t('send_request')),
+          ),
+        ]),
       ),
     );
   }
@@ -128,8 +214,8 @@ class BuyerProductScreen extends ConsumerWidget {
               const Divider(),
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                 Text(t('total'), style: Theme.of(c).textTheme.titleMedium),
-                Text('₹${(unit * qty).toStringAsFixed(0)}',
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.success)),
+                Text(rupees(unit * qty),
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.text)),
               ]),
               Gap.l,
               FilledButton.icon(
@@ -137,7 +223,15 @@ class BuyerProductScreen extends ConsumerWidget {
                   final nav = Navigator.of(c);
                   final messenger = ScaffoldMessenger.of(context);
                   try {
-                    await api.placeOrder(product.id, qty);
+                    // Attach the buyer's default delivery address if they have one.
+                    String? addrId;
+                    try {
+                      final addrs = await api.listAddresses();
+                      if (addrs.isNotEmpty) {
+                        addrId = addrs.firstWhere((a) => a.isDefault, orElse: () => addrs.first).id;
+                      }
+                    } catch (_) {/* address optional */}
+                    await api.placeOrder(product.id, qty, addressId: addrId);
                     nav.pop();
                     if (context.mounted) context.pop();
                     messenger.showSnackBar(SnackBar(content: Text(t('order_placed'))));

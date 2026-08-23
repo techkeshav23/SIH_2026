@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 
+import '../../core/format.dart';
 import '../../core/l10n.dart';
 import '../../core/theme.dart';
 import '../../core/tts.dart';
@@ -22,13 +25,22 @@ class CreateProductScreen extends ConsumerStatefulWidget {
 class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
   final _picker = ImagePicker();
   final _textCtrl = TextEditingController();
+  final _recorder = AudioRecorder();
 
   Product? _product;
   bool _busy = false;
+  bool _recording = false;
   String _status = '';
   PriceSuggestion? _price;
 
   Api get _api => ref.read(apiProvider);
+
+  @override
+  void dispose() {
+    _recorder.dispose();
+    _textCtrl.dispose();
+    super.dispose();
+  }
 
   Future<void> _ensureProduct() async {
     _product ??= await _api.createProduct();
@@ -40,35 +52,10 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
     }
   }
 
-  Future<ImageSource?> _pickSource() {
-    final lang = ref.read(langProvider);
-    return showModalBottomSheet<ImageSource>(
-      context: context,
-      builder: (c) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const SizedBox(height: 8),
-          ListTile(
-            leading: const Icon(Icons.photo_camera_rounded, color: AppColors.primary),
-            title: Text(T.of(context, lang, 'camera')),
-            onTap: () => Navigator.pop(c, ImageSource.camera),
-          ),
-          ListTile(
-            leading: const Icon(Icons.photo_library_rounded, color: AppColors.primary),
-            title: Text(T.of(context, lang, 'gallery')),
-            onTap: () => Navigator.pop(c, ImageSource.gallery),
-          ),
-          const SizedBox(height: 8),
-        ]),
-      ),
-    );
-  }
-
-  Future<void> _takePhoto() async {
+  Future<void> _takePhotoFrom(ImageSource source) async {
     final lang = ref.read(langProvider);
     String path = '';
     if (!_api.demoMode) {
-      final source = await _pickSource();
-      if (source == null) return;
       final file = await _picker.pickImage(source: source, imageQuality: 90);
       if (file == null) return;
       path = file.path;
@@ -86,13 +73,23 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
     }
   }
 
+  /// Voice entry point. Demo mode simulates; real mode records the mic and sends
+  /// the audio to the backend Vertex multimodal speech->listing job.
+  Future<void> _onVoiceTap() async {
+    if (_api.demoMode) {
+      await _simulateVoice();
+      return;
+    }
+    if (_recording) {
+      await _stopAndCatalog();
+    } else {
+      await _startRecording();
+    }
+  }
+
   /// Demo-mode voice: simulate listening, fill a canned transcript, then catalog.
   Future<void> _simulateVoice() async {
     final uiLang = ref.read(langProvider);
-    if (!_api.demoMode) {
-      _snack(uiLang == AppLang.hi ? 'नीचे टाइप करके बताएं' : 'Please describe by typing below');
-      return;
-    }
     setState(() { _busy = true; _status = uiLang == AppLang.hi ? 'सुन रहा है…' : 'Listening…'; });
     await Future.delayed(const Duration(milliseconds: 1300));
     _textCtrl.text = uiLang == AppLang.hi
@@ -100,6 +97,66 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
         : 'This is a handwoven Banarasi silk saree with golden zari work';
     if (mounted) setState(() {});
     await _catalogFromText();
+  }
+
+  /// Start recording the artisan's spoken description to a temp WAV file.
+  Future<void> _startRecording() async {
+    final uiLang = ref.read(langProvider);
+    try {
+      if (!await _recorder.hasPermission()) {
+        _snack(uiLang == AppLang.hi
+            ? 'माइक की अनुमति चाहिए — सेटिंग्स में चालू करें'
+            : 'Microphone permission needed — enable it in Settings');
+        return;
+      }
+      await _ensureProduct();
+      final dir = await getTemporaryDirectory();
+      final path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.wav';
+      await _recorder.start(const RecordConfig(encoder: AudioEncoder.wav), path: path);
+      if (mounted) setState(() => _recording = true);
+    } catch (_) {
+      if (mounted) setState(() => _recording = false);
+      _snack(uiLang == AppLang.hi ? 'रिकॉर्डिंग शुरू नहीं हुई' : 'Could not start recording');
+    }
+  }
+
+  /// Stop recording, upload the clip, and poll until the AI listing is ready.
+  Future<void> _stopAndCatalog() async {
+    final uiLang = ref.read(langProvider);
+    final lang = uiLang == AppLang.hi ? 'hi' : 'en';
+    String? path;
+    try {
+      path = await _recorder.stop();
+    } catch (_) {/* fall through to null-path handling */}
+    if (mounted) setState(() => _recording = false);
+    if (path == null) {
+      _snack(uiLang == AppLang.hi ? 'आवाज़ रिकॉर्ड नहीं हुई' : 'No audio captured — try again');
+      return;
+    }
+    setState(() { _busy = true; _status = T.of(context, uiLang, 'writing_listing'); });
+    try {
+      await _ensureProduct();
+      await _api.catalogFromVoice(_product!.id, path, sourceLang: lang);
+      final ready = await _api.pollUntilReady(_product!.id);
+      setState(() => _product = ready);
+      if ((ready.titleEn ?? '').isEmpty && (ready.titleHi ?? '').isEmpty) {
+        _snack(uiLang == AppLang.hi
+            ? 'साफ़ सुनाई नहीं दिया — फिर बोलें या नीचे टाइप करें'
+            : "Couldn't hear clearly — speak again or type below");
+      }
+    } on DioException catch (e) {
+      if (_isOffline(e)) {
+        _snack(uiLang == AppLang.hi
+            ? 'इंटरनेट नहीं — नीचे टाइप करके ऑफ़लाइन सहेजें'
+            : 'No internet — type below to save offline');
+      } else {
+        _snack(uiLang == AppLang.hi
+            ? 'आवाज़ प्रोसेस नहीं हुई — फिर कोशिश करें'
+            : 'Voice processing failed — please try again');
+      }
+    } finally {
+      if (mounted) setState(() { _busy = false; _status = ''; });
+    }
   }
 
   Future<void> _catalogFromText() async {
@@ -209,11 +266,26 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
                     else if (p?.rawImageUrl != null)
                       KNetImage(_api.mediaUrl(p!.rawImageUrl!), height: 180, radius: Radii.md),
                     if (p?.enhancedImageUrl != null || p?.rawImageUrl != null) Gap.m,
-                    FilledButton.icon(
-                      onPressed: _busy ? null : _takePhoto,
-                      icon: const Icon(Icons.auto_fix_high),
-                      label: Text(T.of(context, lang, 'enhance')),
-                    ),
+                    Row(children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _busy ? null : () => _takePhotoFrom(ImageSource.camera),
+                          icon: const Icon(Icons.photo_camera_rounded, size: 20),
+                          label: Text(T.of(context, lang, 'take_photo')),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _busy ? null : () => _takePhotoFrom(ImageSource.gallery),
+                          icon: const Icon(Icons.photo_library_rounded, size: 20),
+                          label: Text(T.of(context, lang, 'gallery')),
+                        ),
+                      ),
+                    ]),
+                    Gap.xs,
+                    Text(T.of(context, lang, 'photo_hint'),
+                        textAlign: TextAlign.center, style: text.labelSmall),
                   ],
                 ),
               ),
@@ -226,10 +298,24 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     FilledButton.icon(
-                      onPressed: _busy ? null : _simulateVoice,
-                      icon: const Icon(Icons.mic_rounded),
-                      label: Text(T.of(context, lang, 'record_voice')),
+                      onPressed: _busy ? null : _onVoiceTap,
+                      icon: Icon(_recording ? Icons.stop_rounded : Icons.mic_rounded),
+                      label: Text(_recording
+                          ? (lang == AppLang.hi ? 'रोकें और लिखवाएं' : 'Stop & generate')
+                          : T.of(context, lang, 'record_voice')),
+                      style: _recording
+                          ? FilledButton.styleFrom(backgroundColor: AppColors.danger)
+                          : null,
                     ),
+                    if (_recording) ...[
+                      Gap.s,
+                      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        const _RecDot(),
+                        const SizedBox(width: 8),
+                        Text(lang == AppLang.hi ? 'सुन रहा है… बोलिए' : 'Listening… speak now',
+                            style: text.labelMedium?.copyWith(color: AppColors.danger)),
+                      ]),
+                    ],
                     Gap.m,
                     Row(children: [
                       const Expanded(child: Divider()),
@@ -252,7 +338,7 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
                     Gap.s,
                     OutlinedButton.icon(
                       onPressed: _busy ? null : _catalogFromText,
-                      icon: const Icon(Icons.auto_awesome_rounded),
+                      icon: const Icon(Icons.edit_note_rounded),
                       label: Text(T.of(context, lang, 'generate_listing')),
                     ),
                     if (p?.titleEn != null) ...[
@@ -327,7 +413,7 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
                             ),
                             Gap.s,
                             Text(
-                              '₹${_price!.min.toStringAsFixed(0)} – ₹${_price!.max.toStringAsFixed(0)}',
+                              '${rupees(_price!.min)} – ${rupees(_price!.max)}',
                               textAlign: TextAlign.center,
                               style: text.displaySmall?.copyWith(color: AppColors.success),
                             ),
@@ -351,7 +437,7 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
                                     const Icon(Icons.circle, size: 5, color: AppColors.muted),
                                     const SizedBox(width: 8),
                                     Expanded(child: Text(c.title, style: text.bodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis)),
-                                    Text('₹${c.price.toStringAsFixed(0)}',
+                                    Text(rupees(c.price),
                                         style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textSoft)),
                                   ]),
                                 ),
@@ -402,7 +488,38 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
   }
 }
 
-/// A single step in the vertical stepper: numbered gradient badge + connector
+/// A small pulsing red dot shown while the mic is actively recording.
+class _RecDot extends StatefulWidget {
+  const _RecDot();
+  @override
+  State<_RecDot> createState() => _RecDotState();
+}
+
+class _RecDotState extends State<_RecDot> with SingleTickerProviderStateMixin {
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 700))
+        ..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween(begin: 0.35, end: 1.0).animate(_c),
+      child: Container(
+        width: 12,
+        height: 12,
+        decoration: const BoxDecoration(color: AppColors.danger, shape: BoxShape.circle),
+      ),
+    );
+  }
+}
+
+/// A single step in the vertical stepper: numbered square badge + connector
 /// line on the left, titled KCard on the right.
 class _StepCard extends StatelessWidget {
   const _StepCard({
@@ -428,18 +545,17 @@ class _StepCard extends StatelessWidget {
           Column(
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 36,
+                height: 36,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  gradient: Decor.warmGradient,
-                  shape: BoxShape.circle,
-                  boxShadow: Decor.soft,
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(Radii.sm),
                 ),
                 child: Text('$step',
                     style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 17,
+                        fontSize: 16,
                         fontWeight: FontWeight.w800)),
               ),
               if (!isLast)

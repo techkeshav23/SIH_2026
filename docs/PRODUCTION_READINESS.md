@@ -1,6 +1,40 @@
 # KalaSetu — Production-Readiness Verification
 ### Multi-agent audit (4 agents: backend/deploy · app · AI/govt · feature-gap). Honest scorecard.
 
+---
+
+## ✅ v2 — Hardening progress (Aug 2026)
+Most P0s from the audit below are now fixed. Status of each:
+
+| # | P0 item | Status |
+|---|---|---|
+| 1 | SQLite → data loss on Cloud Run | **FIXED & VERIFIED** — Cloud SQL Postgres (`kalasetu-db`, Mumbai) wired via socket connector; OTP login persists a user row across restarts |
+| 2 | `APP_ENV=dev` leaks OTP | **FIXED** — prod runs `APP_ENV=prod`; OTP return now gated behind an explicit `ALLOW_DEV_OTP` flag |
+| 3 | Default `SECRET_KEY` | **FIXED** — strong random secret set in prod env |
+| 5 | Voice cataloging simulated | **FIXED** — real mic recording (`record` 6.2.1) → WAV → Vertex multimodal `/ai/catalog-from-voice`; APK compiles |
+| 6 | Pricing ML model not in prod | **FIXED & VERIFIED** — `.pkl` baked into image; prod predicted base ≈₹778 (heuristic would give ₹2400) |
+| 7 | Image bg-removal is Pillow-only | **FIXED & VERIFIED** — `rembg` (u2netp, baked model) in prod; real cutout in **~2s warm** (Pillow fallback on error). First call after a cold start takes longer (ONNX init) — warm the service before a live demo |
+| 8 | Reviews/notifications dead in real mode | **FIXED & VERIFIED** — persisted DB-backed endpoints (`/products/{id}/reviews`, `/notifications`); notifications written on every order/review event |
+| 9 | No route guards / 401 handling | **FIXED** — GoRouter redirect (login + buyer/artisan separation) + auto-logout→login on unrecoverable 401 |
+| — | Order fulfilment dead-ends at `paid` | **ADDED** — ship → confirm-delivery → completed, + buyer cancel; role-aware app UI + notifications |
+| 4 | Real SMS (MSG91/Twilio) | Still console OTP (demo). Provider-abstracted; add keys for real SMS |
+
+Backend: **54/54 tests pass.** Payments intentionally remain **mock** (per team decision) — the flow works end-to-end; wire Razorpay keys when a merchant account is ready.
+
+### Phase 5 — commerce & compliance (all verified on prod)
+| Item | Status |
+|---|---|
+| Order fulfilment | **VERIFIED** — ship → confirm-delivery → completed, + buyer cancel; role-aware app UI + notifications |
+| DPDP Act 2023 consent | **VERIFIED** — first-run consent gate (versioned + timestamped, stored per user/buyer), privacy policy + Grievance Officer screen |
+| Buyer delivery addresses | **VERIFIED** — address book (default handling), picked at checkout, denormalized ship-to snapshot shown to the artisan for dispatch |
+| Artisan storefront | **VERIFIED** — public shop page (bio + listed products), reachable via "View shop" on any product |
+
+Compliance moved from **5/100** (no consent/policy) to a working DPDP consent trail + privacy policy + grievance officer — the main govt legal blocker is addressed (formal VAPT/DPO registration still pending for a real launch).
+
+*The original audit (unchanged) follows for reference.*
+
+---
+
 ## TL;DR
 **Excellent demo/MVP, NOT production-ready.** The app looks and demos great, real Vertex AI text→listing + pricing work, and it's deployed on Cloud Run. But there are **critical security/persistence bugs in the deploy**, the **flagship voice feature is simulated (not real)**, **image bg-removal isn't actually running**, and **payments/KYC/delivery/compliance are missing or stubbed**.
 

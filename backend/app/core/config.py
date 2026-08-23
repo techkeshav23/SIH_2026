@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     sms_provider: str = "console"            # console | msg91 | twilio
     sms_api_key: str = ""
     sms_sender_id: str = "KLSETU"
+    allow_dev_otp: bool = False              # demo-only: return OTP in the response (no real SMS)
 
     # ---- CORS / rate limiting / uploads ----
     cors_origins: str = "*"                  # comma-separated list or "*"
@@ -44,6 +45,12 @@ class Settings(BaseSettings):
     use_real_ai: bool = False
     use_rembg: bool = False
     cloudinary_url: str = ""
+    gcs_bucket: str = ""             # durable image storage (Cloud Run disk is ephemeral)
+    # Gemini image-to-image "studio" enhancement — turns the artisan's real photo
+    # into a professional product shot (the product stays identical).
+    use_gemini_image: bool = False
+    gemini_image_model: str = "gemini-2.5-flash-image"
+    gemini_image_location: str = "global"   # image-gen isn't served from asia-south1
 
     pricing_model_path: str = "../ml/pricing_model.pkl"
 

@@ -7,12 +7,14 @@ import 'l10n.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
-/// Primary artisan destinations: (route, icon, EN, HI).
+/// Primary artisan destinations: (route, icon, EN, HI). A rich home landing,
+/// their products, incoming orders, and bulk-quote negotiations. Dashboard and
+/// the marketplace preview live in the drawer.
 const List<(String, IconData, String, String)> artisanTabs = [
-  ('/home', Icons.inventory_2_rounded, 'Products', 'उत्पाद'),
+  ('/home', Icons.home_rounded, 'Home', 'होम'),
+  ('/products', Icons.inventory_2_rounded, 'Products', 'उत्पाद'),
   ('/orders', Icons.receipt_long_rounded, 'Orders', 'ऑर्डर'),
-  ('/dashboard', Icons.dashboard_rounded, 'Dashboard', 'डैशबोर्ड'),
-  ('/market', Icons.storefront_rounded, 'Market', 'बाज़ार'),
+  ('/quotes', Icons.gavel_rounded, 'Quotes', 'सौदे'),
 ];
 
 /// Scaffold with a shared sidebar (drawer) + bottom navigation bar for the
@@ -44,15 +46,11 @@ class AppScaffold extends ConsumerWidget {
   }
 }
 
-/// White hamburger button that opens the drawer — pass as KHeader `leading`.
+/// Hamburger button that opens the drawer — pass as KHeader `leading`.
 Widget drawerButton() => Builder(
-      builder: (c) => InkWell(
-        onTap: () => Scaffold.of(c).openDrawer(),
-        borderRadius: BorderRadius.circular(10),
-        child: const Padding(
-          padding: EdgeInsets.all(4),
-          child: Icon(Icons.menu_rounded, color: Colors.white, size: 26),
-        ),
+      builder: (c) => IconButton(
+        onPressed: () => Scaffold.of(c).openDrawer(),
+        icon: const Icon(Icons.menu_rounded, color: AppColors.text, size: 26),
       ),
     );
 
@@ -72,25 +70,36 @@ class AppDrawer extends ConsumerWidget {
         bottom: false,
         child: Column(
           children: [
-            // brand header
+            // brand header (flat, real-app style)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 26, 20, 22),
-              decoration: const BoxDecoration(gradient: Decor.heroGradient),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                border: Border(bottom: BorderSide(color: AppColors.line)),
+              ),
+              child: Row(
                 children: [
                   Container(
-                    width: 56, height: 56, padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+                    width: 44, height: 44, padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceAlt,
+                      borderRadius: BorderRadius.circular(Radii.sm),
+                      border: Border.all(color: AppColors.line),
+                    ),
                     child: Image.asset('assets/icon/logo.png', fit: BoxFit.contain),
                   ),
-                  const SizedBox(height: 14),
-                  const Text('KalaSetu',
-                      style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
-                  const SizedBox(height: 2),
-                  Text(api.demoMode ? (hi ? 'डेमो · कारीगर' : 'Demo · Artisan') : (hi ? 'कारीगर खाता' : 'Artisan account'),
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13)),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('KalaSetu',
+                          style: TextStyle(color: AppColors.text, fontSize: 19, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 1),
+                      Text(api.demoMode ? (hi ? 'डेमो · कारीगर' : 'Demo · Artisan') : (hi ? 'कारीगर खाता' : 'Artisan account'),
+                          style: const TextStyle(color: AppColors.textSoft, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -104,6 +113,16 @@ class AppDrawer extends ConsumerWidget {
                 onTap: () { Navigator.pop(context); if (loc != t.$1) context.go(t.$1); },
               ),
             const Divider(height: 24, indent: 16, endIndent: 16),
+            _DrawerItem(
+              icon: Icons.dashboard_rounded,
+              label: hi ? 'डैशबोर्ड' : 'Dashboard',
+              onTap: () { Navigator.pop(context); context.push('/dashboard'); },
+            ),
+            _DrawerItem(
+              icon: Icons.storefront_outlined,
+              label: hi ? 'बाज़ार झलक' : 'Market preview',
+              onTap: () { Navigator.pop(context); context.push('/market'); },
+            ),
             _DrawerItem(
               icon: Icons.person_rounded,
               label: hi ? 'दुकान प्रोफ़ाइल' : 'Shop Profile',
@@ -136,12 +155,16 @@ class AppDrawer extends ConsumerWidget {
               },
             ),
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('SIH 2026 · PS 26090',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(letterSpacing: 0.4)),
+                  Text('KalaSetu v1.0', style: Theme.of(context).textTheme.labelSmall),
+                  GestureDetector(
+                    onTap: () { Navigator.pop(context); context.push('/privacy'); },
+                    child: Text(hi ? 'गोपनीयता नीति' : 'Privacy Policy',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppColors.primary)),
+                  ),
                 ],
               ),
             ),

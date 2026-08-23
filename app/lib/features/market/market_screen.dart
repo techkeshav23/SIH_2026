@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/format.dart';
 import '../../core/l10n.dart';
-import '../../core/nav.dart';
 import '../../core/theme.dart';
 import '../../core/tts.dart';
 import '../../core/widgets.dart';
@@ -23,46 +23,38 @@ class MarketScreen extends ConsumerWidget {
     final lang = ref.watch(langProvider);
     final title = T.of(context, lang, 'b2b_marketplace');
     final subtitle = T.of(context, lang, 'ondc_ready');
-    return AppScaffold(
-      current: 3,
-      body: Column(
-        children: [
-          KHeader(
-            title: title,
-            subtitle: subtitle,
-            leading: drawerButton(),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                KSpeak('$title. $subtitle', color: Colors.white),
-                const SizedBox(width: 4),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(Radii.pill),
-                    border:
-                        Border.all(color: Colors.white.withValues(alpha: 0.35)),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.verified_rounded,
-                          size: 15, color: Colors.white),
-                      SizedBox(width: 6),
-                      Text('Govt · ONDC',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.2)),
-                    ],
-                  ),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title),
+        actions: [
+          KSpeak('$title. $subtitle'),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(Radii.pill),
+                  border: Border.all(color: AppColors.success.withValues(alpha: 0.30)),
                 ),
-              ],
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.verified_rounded, size: 14, color: AppColors.success),
+                    SizedBox(width: 5),
+                    Text('Govt · ONDC',
+                        style: TextStyle(
+                            color: AppColors.success, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
             ),
           ),
+        ],
+      ),
+      body: Column(
+        children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Row(
@@ -136,9 +128,9 @@ class _FeedCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final img = p.enhancedImageUrl ?? p.rawImageUrl;
     final price = p.finalPrice != null
-        ? '₹${p.finalPrice!.toStringAsFixed(0)}'
+        ? rupees(p.finalPrice!)
         : (p.suggestedPriceMin != null
-            ? '₹${p.suggestedPriceMin!.toStringAsFixed(0)}+'
+            ? '${rupees(p.suggestedPriceMin!)}+'
             : (lang == AppLang.hi ? 'मूल्य पूछें' : 'Ask price'));
 
     return DecoratedBox(
@@ -169,7 +161,7 @@ class _FeedCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      p.titleEn ?? p.titleHi ?? 'Product',
+                      p.titleFor(ProviderScope.containerOf(context).read(langProvider) == AppLang.hi) ?? 'Product',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleMedium,
@@ -178,10 +170,9 @@ class _FeedCard extends StatelessWidget {
                     Text(
                       price,
                       style: const TextStyle(
-                        color: AppColors.success,
+                        color: AppColors.text,
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: -0.2,
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -261,7 +252,7 @@ class _InquirySheetState extends ConsumerState<_InquirySheet> {
   @override
   Widget build(BuildContext context) {
     final lang = ref.watch(langProvider);
-    final title = widget.p.titleEn ?? widget.p.titleHi ?? 'this product';
+    final title = widget.p.titleFor(lang == AppLang.hi) ?? 'this product';
     return Padding(
       padding: EdgeInsets.only(
         left: 20,

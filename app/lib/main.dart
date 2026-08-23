@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/l10n.dart';
@@ -11,6 +12,15 @@ Future<void> main() async {
   Observability.install();
   Observability.runGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+    // Transparent status bar with DARK icons so wifi/battery/time are visible
+    // on the app's light cream background (they were white -> invisible).
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark, // Android
+      statusBarBrightness: Brightness.light, // iOS
+      systemNavigationBarColor: AppColors.surface,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ));
     final container = ProviderContainer();
     await container.read(apiProvider).loadToken();
     runApp(

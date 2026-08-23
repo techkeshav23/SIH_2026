@@ -101,3 +101,155 @@ def test_order_requires_buyer_auth(client, auth):
     # artisan token is not a buyer token
     r = client.post("/orders", headers=auth, json={"product_id": product["id"]})
     assert r.status_code == 401
+
+
+def _paid_order(client, auth, buyer):
+    """Drive an order all the way to 'paid' and return (order_id, buyer_headers)."""
+    product = _listed_product(client, auth, price=1000)
+    bh = {"Authorization": buyer["Authorization"]}
+    oid = client.post("/orders", headers=bh, json={"product_id": product["id"]}).json()["id"]
+    client.post(f"/orders/{oid}/accept", headers=auth)
+    client.post(f"/orders/{oid}/pay", headers=bh)
+    client.post(f"/orders/{oid}/confirm-payment", headers=bh,
+                json={"provider_payment_id": "mock_pay_123"})
+    return oid, bh
+
+
+def test_fulfilment_ship_then_deliver(client, auth, buyer):
+    oid, bh = _paid_order(client, auth, buyer)
+
+    # artisan ships
+    shipped = client.post(f"/orders/{oid}/ship", headers=auth)
+    assert shipped.status_code == 200 and shipped.json()["status"] == "shipped"
+
+    # buyer confirms receipt -> completed
+    done = client.post(f"/orders/{oid}/confirm-delivery", headers=bh)
+    assert done.status_code == 200 and done.json()["status"] == "completed"
+
+
+def test_cannot_ship_before_paid(client, auth, buyer):
+    product = _listed_product(client, auth)
+    bh = {"Authorization": buyer["Authorization"]}
+    oid = client.post("/orders", headers=bh, json={"product_id": product["id"]}).json()["id"]
+    r = client.post(f"/orders/{oid}/ship", headers=auth)
+    assert r.status_code == 409  # not paid yet
+
+
+def test_only_owner_artisan_can_ship(client, auth, buyer):
+    oid, _ = _paid_order(client, auth, buyer)
+    other = _login(client, "+919000000098")
+    r = client.post(f"/orders/{oid}/ship",
+                    headers={"Authorization": f"Bearer {other['access_token']}"})
+    assert r.status_code == 403
+
+
+def test_buyer_cancels_unpaid_order(client, auth, buyer):
+    product = _listed_product(client, auth)
+    bh = {"Authorization": buyer["Authorization"]}
+    oid = client.post("/orders", headers=bh, json={"product_id": product["id"]}).json()["id"]
+    r = client.post(f"/orders/{oid}/cancel", headers=bh)
+    assert r.status_code == 200 and r.json()["status"] == "cancelled"
+
+
+def test_cannot_cancel_paid_order(client, auth, buyer):
+    oid, bh = _paid_order(client, auth, buyer)
+    r = client.post(f"/orders/{oid}/cancel", headers=bh)
+    assert r.status_code == 409
+
+
+def test_dpdp_consent_recorded(client, auth, buyer):
+    # artisan consent persists on /me
+    assert client.post("/consent", headers=auth, json={"version": "2026-08-dpdp-v1"}).status_code == 204
+    me = client.get("/me", headers=auth).json()
+    assert me["consent_version"] == "2026-08-dpdp-v1"
+
+    # buyer consent persists on /buyer/me
+    bh = {"Authorization": buyer["Authorization"]}
+    assert client.post("/consent", headers=bh, json={"version": "2026-08-dpdp-v1"}).status_code == 204
+    bme = client.get("/buyer/me", headers=bh).json()
+    assert bme["consent_version"] == "2026-08-dpdp-v1"
+
+
+def test_consent_requires_auth(client):
+    assert client.post("/consent", json={"version": "x"}).status_code == 401
+
+
+def _address_payload(**over):
+    base = {
+        "name": "Radha Sharma", "phone": "9876500011", "line1": "12 MG Road",
+        "line2": "Near mall", "city": "Jaipur", "state": "Rajasthan", "pincode": "302001",
+    }
+    base.update(over)
+    return base
+
+
+def test_address_crud_and_order_snapshot(client, auth, buyer):
+    bh = {"Authorization": buyer["Authorization"]}
+    product = _listed_product(client, auth, price=500)
+
+    # first address becomes default automatically
+    a = client.post("/orders/addresses", headers=bh, json=_address_payload()).json()
+    assert a["is_default"] is True
+    assert any(x["id"] == a["id"] for x in client.get("/orders/addresses", headers=bh).json())
+
+    # order carries a denormalized shipping snapshot
+    o = client.post("/orders", headers=bh,
+                    json={"product_id": product["id"], "quantity": 1, "address_id": a["id"]}).json()
+    assert o["ship_name"] == "Radha Sharma"
+    assert "Jaipur" in o["ship_address"]
+
+    # delete
+    assert client.delete(f"/orders/addresses/{a['id']}", headers=bh).status_code == 204
+
+
+def test_order_rejects_foreign_address(client, auth, buyer):
+    product = _listed_product(client, auth, price=500)
+    # a second buyer owns the address
+    otp = client.post("/buyer/auth/request-otp", json={"phone": "+919800000077"}).json()["dev_otp"]
+    other = client.post("/buyer/auth/verify-otp", json={"phone": "+919800000077", "otp": otp}).json()
+    oh = {"Authorization": f"Bearer {other['access_token']}"}
+    addr = client.post("/orders/addresses", headers=oh, json=_address_payload()).json()
+
+    bh = {"Authorization": buyer["Authorization"]}
+    r = client.post("/orders", headers=bh,
+                    json={"product_id": product["id"], "address_id": addr["id"]})
+    assert r.status_code == 404  # not the buyer's address
+
+
+def test_storefront_public(client, auth):
+    me = client.get("/me", headers=auth).json()
+    client.patch("/me", headers=auth, json={"name": "Kamla Devi", "craft_type": "Weaving"})
+    _listed_product(client, auth, price=999)
+
+    shop = client.get(f"/buyers/storefront/{me['id']}")
+    assert shop.status_code == 200
+    body = shop.json()
+    assert body["name"] == "Kamla Devi"
+    assert len(body["products"]) >= 1
+
+
+def test_reviews_and_notifications(client, auth, buyer):
+    """Buyer reviews a product; artisan gets a persisted notification."""
+    product = _listed_product(client, auth)
+    bh = {"Authorization": buyer["Authorization"]}
+
+    # public read starts empty
+    assert client.get(f"/products/{product['id']}/reviews").json() == []
+
+    # buyer posts a review
+    r = client.post(f"/products/{product['id']}/reviews", headers=bh,
+                    json={"rating": 5, "text": "Beautiful craftsmanship"})
+    assert r.status_code == 201 and r.json()["rating"] == 5
+
+    # visible publicly now
+    reviews = client.get(f"/products/{product['id']}/reviews").json()
+    assert len(reviews) == 1 and reviews[0]["text"] == "Beautiful craftsmanship"
+
+    # artisan has a persisted 'review' notification
+    notifs = client.get("/notifications", headers=auth).json()
+    assert any(n["type"] == "review" for n in notifs)
+
+    # mark all read
+    assert client.post("/notifications/read", headers=auth).status_code == 204
+    after = client.get("/notifications", headers=auth).json()
+    assert all(n["read"] for n in after)

@@ -1,13 +1,24 @@
 import os
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api import ai, auth, buyer_auth, buyers, dashboard, orders, pricing, products
+from app.api import (
+    ai,
+    auth,
+    buyer_auth,
+    buyers,
+    community,
+    dashboard,
+    orders,
+    pricing,
+    products,
+    quotes,
+)
 from app.core.config import settings
 from app.core.db import init_db
 from app.core.observability import RequestIdMiddleware, init_sentry, setup_logging
@@ -61,9 +72,21 @@ async def _validation_exc(request: Request, exc: RequestValidationError):
     )
 
 
+def _warm_rembg():
+    from app.services import image_ai
+
+    image_ai.warmup()
+
+
 @app.on_event("startup")
 def _startup():
     init_db()
+    # Warm the background-removal model in a background thread so container
+    # startup/readiness isn't blocked but the first enhance is already fast.
+    if settings.use_rembg:
+        import threading
+
+        threading.Thread(target=_warm_rembg, daemon=True).start()
 
 
 @app.get("/health", tags=["auth"])
@@ -90,7 +113,22 @@ app.include_router(buyers.router)
 app.include_router(buyer_auth.router)
 app.include_router(orders.router)
 app.include_router(dashboard.router)
+app.include_router(community.router)
+app.include_router(quotes.router)
 
-_uploads = os.path.join(os.path.dirname(__file__), "..", "uploads")
-os.makedirs(_uploads, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=_uploads), name="uploads")
+# Product images: durable GCS (private bucket, streamed back here) in prod, or
+# the local disk in dev/demo.
+if settings.gcs_bucket:
+    @app.get("/uploads/{filename}", tags=["media"])
+    def serve_upload(filename: str):
+        from app.core import gcs
+
+        data = gcs.get_image(filename)
+        if data is None:
+            raise HTTPException(status_code=404, detail="Image not found")
+        return Response(content=data, media_type="image/jpeg",
+                        headers={"Cache-Control": "public, max-age=86400"})
+else:
+    _uploads = os.path.join(os.path.dirname(__file__), "..", "uploads")
+    os.makedirs(_uploads, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=_uploads), name="uploads")

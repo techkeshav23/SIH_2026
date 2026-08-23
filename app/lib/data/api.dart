@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,6 +13,20 @@ import 'models.dart';
 const String kBaseUrl =
     String.fromEnvironment('BASE_URL', defaultValue: 'http://10.0.2.2:8000');
 
+/// DPDP Act 2023 consent version. Bump when the privacy terms change to
+/// re-prompt every user for fresh consent.
+const String kConsentVersion = '2026-08-dpdp-v1';
+
+/// Defensively coerce an API body into a list of row-maps. Tolerates a wrapped
+/// `{items:[...]}` shape or an error object, and drops any non-map elements —
+/// so one malformed row never crashes a whole list.
+List<Map<String, dynamic>> _rows(dynamic d) {
+  final list = d is List
+      ? d
+      : (d is Map && d['items'] is List ? d['items'] as List : const []);
+  return list.whereType<Map<String, dynamic>>().toList();
+}
+
 final apiProvider = Provider<Api>((ref) => Api());
 
 class Api {
@@ -20,6 +35,11 @@ class Api {
   String? _refreshToken;
   String? _role; // 'artisan' | 'buyer'
   bool demoMode = false; // offline demo — serves canned data, no backend needed
+  bool consentGiven = false; // DPDP consent accepted for kConsentVersion
+
+  /// Bumped whenever the session is force-invalidated (unrecoverable 401).
+  /// The router listens to this to redirect back to /login.
+  final ValueNotifier<int> authChanged = ValueNotifier(0);
 
   Api() : _dio = Dio(BaseOptions(baseUrl: kBaseUrl)) {
     _dio.interceptors.add(InterceptorsWrapper(
@@ -30,19 +50,22 @@ class Api {
         handler.next(options);
       },
       onError: (e, handler) async {
-        // On a 401, try a one-shot refresh then replay the original request.
-        final isAuthRoute = e.requestOptions.path.startsWith('/auth/');
-        if (e.response?.statusCode == 401 &&
-            _refreshToken != null &&
-            !isAuthRoute &&
-            e.requestOptions.extra['retried'] != true) {
-          if (await _refreshAccess()) {
-            final opts = e.requestOptions..extra['retried'] = true;
-            opts.headers['Authorization'] = 'Bearer $_token';
-            try {
-              return handler.resolve(await _dio.fetch(opts));
-            } catch (_) {/* fall through */}
+        final isAuthRoute = e.requestOptions.path.startsWith('/auth/') ||
+            e.requestOptions.path.startsWith('/buyer/auth/');
+        if (e.response?.statusCode == 401 && !isAuthRoute && !demoMode) {
+          // One-shot refresh, then replay the original request.
+          if (_refreshToken != null && e.requestOptions.extra['retried'] != true) {
+            if (await _refreshAccess()) {
+              final opts = e.requestOptions..extra['retried'] = true;
+              opts.headers['Authorization'] = 'Bearer $_token';
+              try {
+                return handler.resolve(await _dio.fetch(opts));
+              } catch (_) {/* fall through to hard logout */}
+            }
           }
+          // Unrecoverable: drop the session and signal the router to show login.
+          await logout();
+          authChanged.value++;
         }
         handler.next(e);
       },
@@ -55,6 +78,19 @@ class Api {
     _refreshToken = prefs.getString('refresh_token');
     _role = prefs.getString('role');
     demoMode = prefs.getBool('demo') ?? false;
+    consentGiven = prefs.getString('consent_version') == kConsentVersion;
+  }
+
+  /// Record DPDP consent locally (and on the server in real mode).
+  Future<void> recordConsent() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('consent_version', kConsentVersion);
+    consentGiven = true;
+    if (!demoMode) {
+      try {
+        await _dio.post('/consent', data: {'version': kConsentVersion});
+      } catch (_) {/* stored locally regardless; retried on next app open */}
+    }
   }
 
   /// Enter offline demo mode as [role] ('artisan' | 'buyer') — no backend needed.
@@ -84,11 +120,13 @@ class Api {
   Future<void> logout() async {
     _token = _refreshToken = _role = null;
     demoMode = false;
+    consentGiven = false;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');
     await prefs.remove('refresh_token');
     await prefs.remove('role');
     await prefs.remove('demo');
+    await prefs.remove('consent_version');
   }
 
   Future<bool> _refreshAccess() async {
@@ -156,8 +194,9 @@ class Api {
     if (demoMode) return Demo.products.map((e) => Product.fromJson(e)).toList();
     try {
       final r = await _dio.get('/products');
-      await LocalStore.cacheProducts(r.data as List);
-      return (r.data as List).map((e) => Product.fromJson(e)).toList();
+      final rows = _rows(r.data);
+      await LocalStore.cacheProducts(rows);
+      return rows.map(Product.fromJson).toList();
     } catch (e) {
       if (_isOffline(e)) {
         final cached = await LocalStore.cachedProducts();
@@ -186,6 +225,15 @@ class Api {
     return Product.fromJson(r.data);
   }
 
+  /// Soft-delete (archive) a product so it leaves listings.
+  Future<void> deleteProduct(String id) async {
+    if (demoMode) {
+      Demo.deleteProduct(id);
+      return;
+    }
+    await _dio.delete('/products/$id');
+  }
+
   // ---- AI ----
   Future<void> enhanceImage(String productId, String filePath) async {
     if (demoMode) {
@@ -199,12 +247,18 @@ class Api {
     await _dio.post('/ai/enhance-image', data: form);
   }
 
+  /// Upload a recorded WAV clip; backend runs Vertex multimodal (speech->listing)
+  /// as a durable job. Caller polls the product until it leaves `processing`.
   Future<void> catalogFromVoice(String productId, String filePath,
       {String sourceLang = 'hi'}) async {
     final form = FormData.fromMap({
       'product_id': productId,
       'source_lang': sourceLang,
-      'file': await MultipartFile.fromFile(filePath),
+      'file': await MultipartFile.fromFile(
+        filePath,
+        filename: 'voice.wav',
+        contentType: DioMediaType('audio', 'wav'),
+      ),
     });
     await _dio.post('/ai/catalog-from-voice', data: form);
   }
@@ -232,7 +286,7 @@ class Api {
     }
     final r = await _dio.get('/buyers/feed',
         queryParameters: {'category': ?category});
-    return (r.data as List).map((e) => Product.fromJson(e)).toList();
+    return _rows(r.data).map(Product.fromJson).toList();
   }
 
   Future<void> sendInquiry(String productId, String orgName, String message) async {
@@ -246,7 +300,7 @@ class Api {
     if (demoMode) return Demo.reviewsFor(productId).map((e) => Review.fromJson(e)).toList();
     try {
       final r = await _dio.get('/products/$productId/reviews');
-      return (r.data as List).map((e) => Review.fromJson(e)).toList();
+      return _rows(r.data).map(Review.fromJson).toList();
     } catch (_) {
       return [];
     }
@@ -267,7 +321,7 @@ class Api {
     if (demoMode) return Demo.notifications.map((e) => AppNotification.fromJson(e)).toList();
     try {
       final r = await _dio.get('/notifications');
-      return (r.data as List).map((e) => AppNotification.fromJson(e)).toList();
+      return _rows(r.data).map(AppNotification.fromJson).toList();
     } catch (_) {
       return [];
     }
@@ -275,7 +329,12 @@ class Api {
 
   Future<int> unreadNotifications() async {
     if (demoMode) return Demo.unreadCount();
-    return 0;
+    try {
+      final r = await _dio.get('/notifications');
+      return _rows(r.data).where((n) => n['read'] != true).length;
+    } catch (_) {
+      return 0;
+    }
   }
 
   Future<void> markNotificationsRead() async {
@@ -299,7 +358,7 @@ class Api {
   Future<List<Order>> incomingOrders() async {
     if (demoMode) return Demo.orders.map((e) => Order.fromJson(e)).toList();
     final r = await _dio.get('/orders/incoming');
-    return (r.data as List).map((e) => Order.fromJson(e)).toList();
+    return _rows(r.data).map(Order.fromJson).toList();
   }
 
   Future<Order> acceptOrder(String id) async {
@@ -315,17 +374,111 @@ class Api {
   }
 
   // ---- orders (buyer side) ----
-  Future<Order> placeOrder(String productId, int quantity, {String? note}) async {
+  Future<Order> placeOrder(String productId, int quantity,
+      {String? note, String? addressId}) async {
     if (demoMode) return Order.fromJson(Demo.placeOrder(productId, quantity));
-    final r = await _dio.post('/orders',
-        data: {'product_id': productId, 'quantity': quantity, 'note': note});
+    final r = await _dio.post('/orders', data: {
+      'product_id': productId,
+      'quantity': quantity,
+      'note': note,
+      'address_id': addressId,
+    });
     return Order.fromJson(r.data);
+  }
+
+  // ---- delivery addresses (buyer) ----
+  Future<List<Address>> listAddresses() async {
+    if (demoMode) return Demo.addresses.map((e) => Address.fromJson(e)).toList();
+    final r = await _dio.get('/orders/addresses');
+    return _rows(r.data).map(Address.fromJson).toList();
+  }
+
+  Future<Address> addAddress(Map<String, dynamic> body) async {
+    if (demoMode) return Address.fromJson(Demo.addAddress(body));
+    final r = await _dio.post('/orders/addresses', data: body);
+    return Address.fromJson(r.data);
+  }
+
+  Future<void> deleteAddress(String id) async {
+    if (demoMode) {
+      Demo.deleteAddress(id);
+      return;
+    }
+    await _dio.delete('/orders/addresses/$id');
+  }
+
+  // ---- B2B quotes / negotiation (RFQ) ----
+  Future<Quote> createQuote(String productId, int quantity, double targetPrice, {String? message}) async {
+    if (demoMode) return Quote.fromJson(Demo.createQuote(productId, quantity, targetPrice, message));
+    final r = await _dio.post('/quotes', data: {
+      'product_id': productId, 'quantity': quantity, 'target_price': targetPrice, 'message': message,
+    });
+    return Quote.fromJson(r.data);
+  }
+
+  Future<List<Quote>> myQuotes() async {
+    if (demoMode) return Demo.quotes.map((e) => Quote.fromJson(e)).toList();
+    final r = await _dio.get('/quotes');
+    return _rows(r.data).map(Quote.fromJson).toList();
+  }
+
+  Future<List<Quote>> incomingQuotes() async {
+    if (demoMode) return Demo.quotes.map((e) => Quote.fromJson(e)).toList();
+    final r = await _dio.get('/quotes/incoming');
+    return _rows(r.data).map(Quote.fromJson).toList();
+  }
+
+  Future<Quote> counterQuote(String id, double price) async {
+    if (demoMode) return Quote.fromJson(Demo.quoteAction(id, 'counter', price: price, byBuyer: isBuyer));
+    final r = await _dio.post('/quotes/$id/counter', data: {'price': price});
+    return Quote.fromJson(r.data);
+  }
+
+  Future<Quote> acceptQuote(String id) async {
+    if (demoMode) return Quote.fromJson(Demo.quoteAction(id, 'accept', byBuyer: isBuyer));
+    final r = await _dio.post('/quotes/$id/accept');
+    return Quote.fromJson(r.data);
+  }
+
+  Future<Quote> declineQuote(String id) async {
+    if (demoMode) return Quote.fromJson(Demo.quoteAction(id, 'decline', byBuyer: isBuyer));
+    final r = await _dio.post('/quotes/$id/decline');
+    return Quote.fromJson(r.data);
+  }
+
+  // ---- artisan storefront (public) ----
+  Future<Storefront> getStorefront(String artisanId) async {
+    if (demoMode) return Storefront.fromJson(Demo.storefront());
+    final r = await _dio.get('/buyers/storefront/$artisanId');
+    return Storefront.fromJson(r.data);
   }
 
   Future<List<Order>> myOrders() async {
     if (demoMode) return Demo.buyerOrders().map((e) => Order.fromJson(e)).toList();
     final r = await _dio.get('/orders');
-    return (r.data as List).map((e) => Order.fromJson(e)).toList();
+    return _rows(r.data).map(Order.fromJson).toList();
+  }
+
+  // ---- fulfilment ----
+  /// Artisan dispatches a paid order.
+  Future<Order> shipOrder(String id) async {
+    if (demoMode) return Order.fromJson(Demo.setOrderStatus(id, 'shipped'));
+    final r = await _dio.post('/orders/$id/ship');
+    return Order.fromJson(r.data);
+  }
+
+  /// Buyer confirms receipt -> completed.
+  Future<Order> confirmDelivery(String id) async {
+    if (demoMode) return Order.fromJson(Demo.setOrderStatus(id, 'completed'));
+    final r = await _dio.post('/orders/$id/confirm-delivery');
+    return Order.fromJson(r.data);
+  }
+
+  /// Buyer cancels an unpaid order.
+  Future<Order> cancelOrder(String id) async {
+    if (demoMode) return Order.fromJson(Demo.setOrderStatus(id, 'cancelled'));
+    final r = await _dio.post('/orders/$id/cancel');
+    return Order.fromJson(r.data);
   }
 
   /// Pay (mock gateway) then confirm — returns the paid order.
