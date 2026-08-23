@@ -120,13 +120,13 @@ class Api {
   Future<void> logout() async {
     _token = _refreshToken = _role = null;
     demoMode = false;
-    consentGiven = false;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');
     await prefs.remove('refresh_token');
     await prefs.remove('role');
     await prefs.remove('demo');
-    await prefs.remove('consent_version');
+    // Keep consent: it's device + terms-version scoped (see kConsentVersion),
+    // not per-account — wiping it forced the DPDP gate on every re-login.
   }
 
   Future<bool> _refreshAccess() async {

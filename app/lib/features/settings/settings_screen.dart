@@ -7,6 +7,7 @@ import '../../core/theme.dart';
 import '../../core/tts.dart';
 import '../../core/widgets.dart';
 import '../../data/api.dart';
+import '../../data/cart.dart';
 
 class _LangTile extends StatelessWidget {
   const _LangTile({required this.label, required this.selected, required this.onTap});
@@ -136,6 +137,7 @@ class SettingsScreen extends ConsumerWidget {
                   title: t('logout_q'), message: t('logout_msg'), confirm: t('logout'), danger: true);
               if (!ok || !context.mounted) return;
               await ref.read(apiProvider).logout();
+              ref.invalidate(cartProvider); // don't leak the cart into the next account
               if (context.mounted) context.go('/login');
             },
             icon: const Icon(Icons.logout_rounded),

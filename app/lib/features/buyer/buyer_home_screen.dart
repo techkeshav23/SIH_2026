@@ -108,6 +108,7 @@ class _BuyerDrawer extends ConsumerWidget {
                   confirm: hi ? 'लॉग आउट' : 'Logout', danger: true);
               if (!ok || !context.mounted) return;
               await api.logout();
+              ref.invalidate(cartProvider); // don't leak the cart into the next account
               if (context.mounted) context.go('/login');
             },
           ),
