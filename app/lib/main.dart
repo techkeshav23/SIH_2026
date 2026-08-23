@@ -44,9 +44,21 @@ class KalaSetuApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       routerConfig: buildRouter(api),
-      builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)),
-        child: child!,
+      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+        // Base status-bar style for every route: DARK icons for the light cream
+        // UI. Without this, a screen that set light icons (e.g. Home's dark hero)
+        // leaves them white when you navigate away, making wifi/battery/time
+        // invisible on the cream background. Screens with a dark backdrop assert
+        // their own AnnotatedRegion, which sits above this and wins while shown.
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.light,
+        ),
+        child: MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)),
+          child: child!,
+        ),
       ),
     );
   }
