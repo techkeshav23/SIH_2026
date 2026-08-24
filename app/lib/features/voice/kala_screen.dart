@@ -65,11 +65,17 @@ class _KalaScreenState extends ConsumerState<KalaScreen> {
       await _ws!.ready;
       _wsSub = _ws!.stream.listen(_onMessage, onDone: _teardown, onError: (_) => _fail());
 
-      // mic: 16 kHz mono PCM16 stream -> WebSocket
+      // mic: 16 kHz mono PCM16 stream -> WebSocket. echoCancel/noiseSuppress are
+      // essential for hands-free SPEAKER mode — otherwise the mic picks up Kala's
+      // own voice from the speaker and feeds it back (echo). autoGain evens out
+      // soft/loud speakers.
       final mic = await _recorder.startStream(const RecordConfig(
         encoder: AudioEncoder.pcm16bits,
         sampleRate: 16000,
         numChannels: 1,
+        echoCancel: true,
+        noiseSuppress: true,
+        autoGain: true,
       ));
       _micSub = mic.listen((chunk) => _ws?.sink.add(chunk));
 
