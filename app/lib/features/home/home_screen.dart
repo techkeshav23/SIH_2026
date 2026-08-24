@@ -53,6 +53,28 @@ final homeHeadProvider = FutureProvider.autoDispose<HomeHead>((ref) async {
 // ─────────────────────────────────────────────────────────────────────────────
 // HOME — a rich landing: gradient hero + snapshot + quick action + carousel.
 // ─────────────────────────────────────────────────────────────────────────────
+/// Floating shortcut on Home to talk to the Kala voice agent.
+class _KalaFab extends StatelessWidget {
+  const _KalaFab({required this.hi});
+  final bool hi;
+  @override
+  Widget build(BuildContext context) {
+    return FloatingActionButton.extended(
+      onPressed: () => context.push('/kala'),
+      backgroundColor: AppColors.primary,
+      foregroundColor: Colors.white,
+      elevation: 4,
+      icon: const CircleAvatar(
+        radius: 15,
+        backgroundColor: Colors.white,
+        backgroundImage: AssetImage('assets/kala.png'),
+      ),
+      label: Text(hi ? 'कला से पूछें' : 'Ask Kala',
+          style: const TextStyle(fontWeight: FontWeight.w800)),
+    );
+  }
+}
+
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -80,6 +102,7 @@ class HomeScreen extends ConsumerWidget {
       ),
       child: AppScaffold(
         current: 0,
+        fab: _KalaFab(hi: hi),
         body: RefreshIndicator(
           color: AppColors.primary,
           onRefresh: refreshAll,
