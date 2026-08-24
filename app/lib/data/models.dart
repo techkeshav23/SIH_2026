@@ -342,6 +342,31 @@ class AppNotification {
       );
 }
 
+/// Response from POST /promote/boost (docs/PROMOTE_ADS_API.md).
+class BoostResult {
+  final String status; // under_review | active | rejected | failed
+  final String? adId;
+  final String? campaignId;
+  final List<int> estimatedReach;
+  final String? permalink;
+
+  BoostResult({
+    required this.status,
+    this.adId,
+    this.campaignId,
+    this.estimatedReach = const [],
+    this.permalink,
+  });
+
+  factory BoostResult.fromJson(Map<String, dynamic> j) => BoostResult(
+        status: j['status'] ?? 'under_review',
+        adId: j['ad_id'],
+        campaignId: j['campaign_id'],
+        estimatedReach: (j['estimated_reach'] as List?)?.map((e) => (e as num).toInt()).toList() ?? const [],
+        permalink: j['permalink'],
+      );
+}
+
 class Campaign {
   final String id;
   final String name;

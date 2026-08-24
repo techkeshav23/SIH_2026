@@ -205,3 +205,168 @@ def _stub_campaign(name: str, error: str | None = None) -> dict:
     fake_id = f"stub_{uuid.uuid4().hex[:12]}"
     log.info("Meta campaign stub used for %r (real API disabled/unavailable)", name)
     return {"id": fake_id, "url": None, "stub": True, "error": error}
+
+
+# ---- Promote/Boost contract (docs/PROMOTE_ADS_API.md) ----
+# Budget lives on the AdSet here (not the Campaign) since it's spread across
+# `days`, matching the documented request shape {budget_rupees, days, audience}.
+_META_MIN_DAILY_BUDGET_INR = 97.0  # Meta's account floor is ~₹96.15/day; round up
+
+
+def boost_product(
+    name: str,
+    budget_rupees: float,
+    days: int,
+    audience: str,
+    caption: str,
+    image_bytes: bytes | None,
+    link: str = "https://kalasetu.example",
+) -> dict:
+    """Implements POST /promote/boost per docs/PROMOTE_ADS_API.md: Campaign ->
+    AdSet (budget/days/audience) -> AdCreative (image + caption) -> Ad, all
+    PAUSED. Returns {"status", "ad_id", "campaign_id", "estimated_reach",
+    "permalink"} — or {"status": "failed", "error": ...} on any failure (the
+    router maps that to its own error responses; this function itself never
+    raises)."""
+    reach = [round(budget_rupees * days * 1.4), round(budget_rupees * days * 3.2)]
+    if not enabled():
+        return _stub_boost(reach)
+    try:
+        return _boost_real(name, budget_rupees, days, audience, caption, image_bytes, link, reach)
+    except Exception as e:  # noqa: BLE001
+        log.warning("Meta boost failed for %r: %s", name, e)
+        return {"status": "failed", "error": str(e)[:300]}
+
+
+def _boost_real(
+    name: str,
+    budget_rupees: float,
+    days: int,
+    audience: str,
+    caption: str,
+    image_bytes: bytes | None,
+    link: str,
+    reach: list[int],
+) -> dict:
+    import base64
+    import json as _json
+    from datetime import datetime, timedelta, timezone
+
+    account = _account()
+    token = settings.meta_access_token
+    base = f"{_GRAPH_BASE}/{settings.meta_api_version}"
+
+    # A per-day budget below Meta's account floor (~₹96.15/day) is rejected —
+    # protect the artisan's chosen total budget by never dropping under it,
+    # rather than silently failing on a low budget/days combo (e.g. ₹200/7 days).
+    daily_budget_inr = max(budget_rupees / max(days, 1), _META_MIN_DAILY_BUDGET_INR)
+
+    # 1. Campaign — PAUSED, no campaign-level budget (AdSet carries it).
+    camp_resp = httpx.post(
+        f"{base}/act_{account}/campaigns",
+        data={
+            "name": name,
+            "objective": "OUTCOME_TRAFFIC",
+            "status": "PAUSED",
+            "special_ad_categories": "[]",
+            "is_adset_budget_sharing_enabled": "false",
+            "access_token": token,
+        },
+        timeout=20.0,
+    )
+    camp_resp.raise_for_status()
+    campaign_id = camp_resp.json()["id"]
+
+    # 2. AdSet — budget + duration + audience.
+    geo = (
+        {"countries": ["IN"]}
+        if audience != "nearby"
+        # No stored artisan lat/lng yet — degrade to India-wide rather than
+        # failing; still meaningfully "PAUSED and inspectable" for the demo.
+        else {"countries": ["IN"]}
+    )
+    start = datetime.now(timezone.utc) + timedelta(minutes=10)
+    end = start + timedelta(days=days)
+    adset_resp = httpx.post(
+        f"{base}/act_{account}/adsets",
+        data={
+            "name": f"{name} — AdSet",
+            "campaign_id": campaign_id,
+            "daily_budget": _to_paise(daily_budget_inr),
+            "billing_event": "IMPRESSIONS",
+            "optimization_goal": "REACH",
+            "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
+            "start_time": start.strftime("%Y-%m-%dT%H:%M:%S%z"),
+            "end_time": end.strftime("%Y-%m-%dT%H:%M:%S%z"),
+            "targeting": _json.dumps({"geo_locations": geo, "age_min": 18, "age_max": 65}),
+            "status": "PAUSED",
+            "access_token": token,
+        },
+        timeout=20.0,
+    )
+    adset_resp.raise_for_status()
+    adset_id = adset_resp.json()["id"]
+
+    # 3 & 4. AdCreative (image + caption) + Ad — only if we have both an image
+    # and a linked Page (object_story_spec requires page_id). Without either,
+    # the campaign+adset are still real and PAUSED, just without a full ad.
+    ad_id = None
+    permalink = None
+    if image_bytes and settings.meta_page_id:
+        img_resp = httpx.post(
+            f"{base}/act_{account}/adimages",
+            data={"bytes": base64.b64encode(image_bytes).decode("ascii"), "access_token": token},
+            timeout=30.0,
+        )
+        img_resp.raise_for_status()
+        image_hash = next(iter(img_resp.json().get("images", {}).values()))["hash"]
+
+        creative_resp = httpx.post(
+            f"{base}/act_{account}/adcreatives",
+            data={
+                "name": f"{name} — Creative",
+                "object_story_spec": _json.dumps({
+                    "page_id": settings.meta_page_id,
+                    "link_data": {"image_hash": image_hash, "link": link, "message": caption},
+                }),
+                "access_token": token,
+            },
+            timeout=20.0,
+        )
+        creative_resp.raise_for_status()
+        creative_id = creative_resp.json()["id"]
+
+        ad_resp = httpx.post(
+            f"{base}/act_{account}/ads",
+            data={
+                "name": f"{name} — Ad",
+                "adset_id": adset_id,
+                "creative": _json.dumps({"creative_id": creative_id}),
+                "status": "PAUSED",
+                "access_token": token,
+            },
+            timeout=20.0,
+        )
+        ad_resp.raise_for_status()
+        ad_id = ad_resp.json()["id"]
+        permalink = _manager_url(campaign_id)
+
+    return {
+        "status": "under_review",
+        "ad_id": ad_id,
+        "campaign_id": campaign_id,
+        "estimated_reach": reach,
+        "permalink": permalink or _manager_url(campaign_id),
+    }
+
+
+def _stub_boost(reach: list[int]) -> dict:
+    import uuid
+
+    return {
+        "status": "under_review",
+        "ad_id": f"stub_{uuid.uuid4().hex[:12]}",
+        "campaign_id": f"stub_{uuid.uuid4().hex[:12]}",
+        "estimated_reach": reach,
+        "permalink": None,
+    }

@@ -174,3 +174,37 @@ def _generate_stub(description_en: str, category: str, material: str) -> Catalog
         tags=["handmade", "handloom", mat.lower(), "artisan", "sustainable", "made-in-india"],
         transcript=None,
     )
+
+
+# ---------- marketing caption (for the Promote/Poster feature) ----------
+def marketing_caption(title: str, desc: str, price: float, lang: str = "hi") -> str:
+    """Short, catchy social-media caption for a product. Falls back to a template."""
+    if _gemini_enabled():
+        try:
+            return _with_retry(lambda: _gemini_caption(title, desc, price, lang), "caption")
+        except Exception:  # noqa: BLE001
+            log.error("Gemini caption failed — using template")
+    return _caption_template(title, price, lang)
+
+
+def _gemini_caption(title: str, desc: str, price: float, lang: str) -> str:
+    langname = "Hindi (Devanagari)" if lang == "hi" else "English"
+    prompt = (
+        f"Write a short, catchy social-media marketing caption in {langname} for a handmade "
+        f"product, to post on WhatsApp Status / Instagram. 3-5 short lines, warm and appealing, "
+        f"with a couple of relevant emojis, 3 hashtags, and a clear call-to-action to order. "
+        f"Product: '{title}'. Details: '{desc}'. Price: Rs {int(price)}. "
+        f"Return ONLY the caption text (no quotes, no preamble)."
+    )
+    client = _client()  # hold a strong ref for the whole call (see ai_client.build_client)
+    resp = client.models.generate_content(model=settings.gemini_model, contents=prompt)
+    text = (getattr(resp, "text", None) or "").strip()
+    return text or _caption_template(title, price, lang)
+
+
+def _caption_template(title: str, price: float, lang: str) -> str:
+    if lang == "hi":
+        return (f"✨ {title} ✨\n\n💰 सिर्फ़ ₹{int(price)}\n🎨 हाथ से बना · शुद्ध कारीगरी\n"
+                f"📞 ऑर्डर के लिए संपर्क करें!\n\n#KalaSetu #handmade #artisan")
+    return (f"✨ {title} ✨\n\n💰 Only ₹{int(price)}\n🎨 Handmade · Authentic craft\n"
+            f"📞 DM to order!\n\n#KalaSetu #handmade #artisan")

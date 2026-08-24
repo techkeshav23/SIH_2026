@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/format.dart';
 import '../../core/l10n.dart';
-import '../../core/nav.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/api.dart';
@@ -104,17 +103,9 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                 ),
               );
 
-    // Artisan: a first-class bottom-nav tab (index 2). Buyer: a pushed screen.
-    if (_api.isBuyer) {
-      return Scaffold(appBar: AppBar(title: Text(t('quotes'))), body: body);
-    }
-    return AppScaffold(
-      current: 3,
-      body: Column(children: [
-        KHeader(title: t('quotes'), leading: drawerButton()),
-        Expanded(child: body),
-      ]),
-    );
+    // Pushed screen for both roles (artisan reaches it from the drawer,
+    // buyer from their menu) — plain app bar with a back button.
+    return Scaffold(appBar: AppBar(title: Text(t('quotes'))), body: body);
   }
 }
 

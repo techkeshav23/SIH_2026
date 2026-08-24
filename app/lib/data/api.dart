@@ -592,6 +592,40 @@ class Api {
   String mediaUrl(String path) =>
       (path.startsWith('http') || path.startsWith('asset:')) ? path : '$kBaseUrl$path';
 
+  /// AI-written marketing caption for the Promote poster (Gemini). Returns null
+  /// on failure so the caller falls back to a local template.
+  Future<String?> marketingCaption(String productId, {String lang = 'hi'}) async {
+    try {
+      final r = await _dio.post('/promote/caption',
+          data: {'product_id': productId, 'lang': lang});
+      return r.data['caption'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Boost a product as a real (PAUSED — never spends) Meta ad campaign. See
+  /// docs/PROMOTE_ADS_API.md for the backend contract.
+  Future<BoostResult> boostProduct({
+    required String productId,
+    required double budgetRupees,
+    required int days,
+    required String audience,   // "nearby" | "india"
+    required String imageSource, // "poster" | "studio" | "gallery"
+  }) async {
+    if (demoMode) {
+      return BoostResult.fromJson(Demo.boostProduct(budgetRupees, days));
+    }
+    final r = await _dio.post('/promote/boost', data: {
+      'product_id': productId,
+      'budget_rupees': budgetRupees,
+      'days': days,
+      'audience': audience,
+      'image_source': imageSource,
+    });
+    return BoostResult.fromJson(r.data);
+  }
+
   /// WebSocket URL for the Kala voice agent (http->ws, https->wss), with the
   /// artisan's access token so the backend can scope tools to them.
   String get voiceWsUrl =>

@@ -317,6 +317,19 @@ class Demo {
     return q;
   }
 
+  // ---- promote / boost (demo) ----
+  static Map<String, dynamic> boostProduct(double budgetRupees, int days) {
+    final low = (budgetRupees * days * 1.4).round();
+    final high = (budgetRupees * days * 3.2).round();
+    return {
+      'status': 'under_review',
+      'ad_id': 'demo_ad_${_seq++}',
+      'campaign_id': 'demo_campaign_${_seq++}',
+      'estimated_reach': [low, high],
+      'permalink': null,
+    };
+  }
+
   // ---- ad campaigns (Meta / Google Ads) ----
   static final List<Map<String, dynamic>> campaigns = [];
 
