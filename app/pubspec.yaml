@@ -18,6 +18,10 @@ dependencies:
   # networking
   dio: ^5.7.0
 
+  # persistent (disk) image cache — product photos load instantly on revisit /
+  # relaunch instead of re-downloading every time
+  cached_network_image: ^3.4.1
+
   # Indian number/currency formatting (₹ with lakh/crore grouping)
   intl: ^0.20.2
 

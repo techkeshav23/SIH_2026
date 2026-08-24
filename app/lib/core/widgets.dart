@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -192,16 +193,29 @@ class KNetImage extends StatelessWidget {
     // only attempt a network load for a real http(s) url; anything else -> placeholder
     final uri = Uri.tryParse(u);
     if (uri == null || !(uri.scheme == 'http' || uri.scheme == 'https')) return ph;
+    // CachedNetworkImage keeps a persistent DISK cache, so a product photo loads
+    // instantly on revisit / relaunch instead of re-downloading every time
+    // (the big win on slow mobile networks). memCacheWidth/Height still bound the
+    // decode to the on-screen size.
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
-      child: Image.network(u, width: width, height: height, fit: fit,
-          cacheWidth: cw, cacheHeight: ch,
-          errorBuilder: (_, _, _) => ph,
-          loadingBuilder: (c, child, p) => p == null
-              ? child
-              : Container(width: width, height: height, color: AppColors.surfaceAlt,
-                  child: const Center(
-                      child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))))),
+      child: CachedNetworkImage(
+        imageUrl: u,
+        width: width,
+        height: height,
+        fit: fit,
+        memCacheWidth: cw,
+        memCacheHeight: ch,
+        fadeInDuration: const Duration(milliseconds: 150),
+        placeholder: (_, _) => Container(
+            width: width,
+            height: height,
+            color: AppColors.surfaceAlt,
+            child: const Center(
+                child: SizedBox(
+                    width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)))),
+        errorWidget: (_, _, _) => ph,
+      ),
     );
   }
 }
