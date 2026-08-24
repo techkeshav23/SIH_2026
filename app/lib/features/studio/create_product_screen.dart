@@ -359,9 +359,10 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
                               const SizedBox(height: 2),
                               Text((lang == AppLang.hi ? p.titleEn : p.titleHi)!, style: text.bodyMedium),
                             ],
-                            if ((p.descHi ?? '').isNotEmpty) ...[
+                            if ((p.descFor(lang == AppLang.hi) ?? '').isNotEmpty) ...[
                               Gap.s,
-                              Text(p.descHi ?? '', style: text.bodyMedium),
+                              // Description in the artisan's selected language.
+                              Text(p.descFor(lang == AppLang.hi) ?? '', style: text.bodyMedium),
                             ],
                             if (p.tags.isNotEmpty) ...[
                               Gap.s,
