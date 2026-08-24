@@ -66,6 +66,12 @@ def add_review(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found")
     if not 1 <= body.rating <= 5:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Rating must be 1-5")
+    # One review per buyer per product.
+    already = db.scalar(
+        select(Review).where(Review.product_id == product_id, Review.buyer_id == buyer.id)
+    )
+    if already:
+        raise HTTPException(status.HTTP_409_CONFLICT, "You have already reviewed this product")
 
     author = buyer.name or buyer.org_name or "Buyer"
     review = Review(

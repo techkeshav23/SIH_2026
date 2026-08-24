@@ -61,6 +61,10 @@ def update_product(
     db: Session = Depends(get_db),
 ):
     p = _owned(db, user, product_id)
+    if body.final_price is not None and body.final_price <= 0:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "final_price must be greater than 0"
+        )
     was_listed = p.status == "listed"
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(p, field, value)
