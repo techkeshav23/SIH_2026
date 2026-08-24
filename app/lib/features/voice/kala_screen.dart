@@ -32,6 +32,7 @@ class _KalaScreenState extends ConsumerState<KalaScreen> {
   bool _speaking = false;
   _Kala _state = _Kala.idle;
   String _status = '';
+  String _caption = ''; // live transcript of what Kala is saying
 
   Api get _api => ref.read(apiProvider);
   bool get _hi => ref.read(langProvider) == AppLang.hi;
@@ -91,6 +92,7 @@ class _KalaScreenState extends ConsumerState<KalaScreen> {
       if (!_speaking && mounted) {
         setState(() {
           _speaking = true;
+          _caption = ''; // fresh turn
           _status = _hi ? 'कला बोल रही है…' : 'Kala is speaking…';
         });
       }
@@ -99,6 +101,9 @@ class _KalaScreenState extends ConsumerState<KalaScreen> {
       switch (ev['type']) {
         case 'tool':
           if (mounted) setState(() => _status = _hi ? 'देख रही हूँ…' : 'Checking…');
+          break;
+        case 'caption':
+          if (mounted) setState(() => _caption += (ev['text'] as String?) ?? '');
           break;
         case 'interrupted':
           _pcmQueue.clear(); // barge-in: drop queued audio
@@ -183,6 +188,20 @@ class _KalaScreenState extends ConsumerState<KalaScreen> {
               textAlign: TextAlign.center,
               style: text.bodySmall?.copyWith(color: Colors.white70),
             ),
+            if (_caption.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(_caption,
+                      textAlign: TextAlign.center,
+                      style: text.bodyLarge?.copyWith(color: Colors.white, height: 1.4)),
+                ),
+              ),
             const Spacer(),
             Padding(
               padding: EdgeInsets.fromLTRB(24, 0, 24, 24 + MediaQuery.paddingOf(context).bottom),

@@ -26,11 +26,13 @@ log = logging.getLogger("kalasetu.voice")
 
 _SYSTEM = (
     "Tum 'Kala' ho — Bharat ke kaarigaron (artisans) ki AI awaaz-madadgaar, "
-    "KalaSetu app ke andar. Hamesha saral Hindi me, chhote aur pyaar bhare vaakya "
-    "me baat karo. Kaarigar aksar padh-likh nahi sakte, isliye seedha aur aasan "
-    "bolo. Order, kamai, ya listing ke sawaal pe zaroori tools call karke asli "
-    "aankde batao. Kabhi aankde mat banao. Zaroorat ho to agla kadam bata do "
-    "(jaise 'photo daaliye' ya 'keemat batayiye')."
+    "KalaSetu app ke andar. Kaarigar JIS bhaasha me baat kare (Hindi, English, ya "
+    "koi bhi Bhartiya bhaasha jaise Tamil, Bangla, Marathi, Telugu), USI bhaasha me "
+    "jawab do — poore jawab me sirf EK hi bhaasha rakho, mix mat karo. Agar bhaasha "
+    "saaf pata na chale to Hindi me bolo. Chhote, saral aur pyaar bhare vaakya me "
+    "baat karo; kaarigar aksar padh-likh nahi sakte, isliye seedha aur aasan bolo. "
+    "Order, kamai, ya listing ke sawaal pe zaroori tools call karke asli aankde "
+    "batao — kabhi aankde mat banao. Zaroorat ho to agla kadam bata do."
 )
 
 
@@ -91,6 +93,9 @@ def _live_config() -> types.LiveConnectConfig:
     return types.LiveConnectConfig(
         response_modalities=["AUDIO"],
         tools=_tool_declarations(),
+        # transcript of Kala's speech -> forwarded to the app as live captions
+        # (accessibility + lets the UI show what she said).
+        output_audio_transcription=types.AudioTranscriptionConfig(),
         system_instruction=types.Content(parts=[types.Part(text=_SYSTEM)]),
     )
 
@@ -179,6 +184,9 @@ async def voice_live(ws: WebSocket):
                         sc = getattr(resp, "server_content", None)
                         if sc and getattr(sc, "interrupted", False):
                             await ws.send_text(json.dumps({"type": "interrupted"}))
+                        ot = getattr(sc, "output_transcription", None) if sc else None
+                        if ot and getattr(ot, "text", None):
+                            await ws.send_text(json.dumps({"type": "caption", "text": ot.text}))
                     # one turn (receive pass) ended
                     if had_audio:
                         await ws.send_text(json.dumps({"type": "turn_complete"}))
