@@ -317,6 +317,24 @@ class Demo {
     return q;
   }
 
+  // ---- ad campaigns (Meta / Google Ads) ----
+  static final List<Map<String, dynamic>> campaigns = [];
+
+  static Map<String, dynamic> newCampaign(String name, List<String> platforms) {
+    final ids = <String, dynamic>{};
+    for (final pf in platforms) {
+      ids[pf] = 'demo_${pf}_${_seq++}';
+    }
+    final c = {
+      'id': 'c${_seq++}', 'name': name, 'product_id': null,
+      'objective': 'OUTCOME_TRAFFIC', 'daily_budget': 200.0,
+      'platforms': platforms, 'status': 'created',
+      'platform_ids': ids, 'platform_urls': <String, dynamic>{}, 'error': null,
+    };
+    campaigns.insert(0, c);
+    return c;
+  }
+
   // ---- artisan storefront (public) ----
   static Map<String, dynamic> storefront() => {
         'artisan_id': 'demo',

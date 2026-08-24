@@ -86,6 +86,24 @@ class Settings(BaseSettings):
     ondc_signing_key: str = ""
     ondc_base_url: str = ""
 
+    # ---- Ad campaigns (P8) ----
+    # Meta Marketing API — creates a real, PAUSED campaign in the artisan's own ad
+    # account (never spends, never goes live). Off -> stub (fake campaign id/url).
+    use_meta_ads: bool = False
+    meta_app_id: str = ""
+    meta_app_secret: str = ""
+    meta_access_token: str = ""       # long-lived user/system-user token (ads_management)
+    meta_ad_account_id: str = ""      # numeric id, without the "act_" prefix
+    meta_api_version: str = "v21.0"
+
+    # Google Ads API — same PAUSED-campaign-only approach. Off -> stub.
+    use_google_ads: bool = False
+    google_ads_developer_token: str = ""
+    google_ads_client_id: str = ""
+    google_ads_client_secret: str = ""
+    google_ads_refresh_token: str = ""
+    google_ads_customer_id: str = ""  # 10-digit id, no dashes
+
     @property
     def is_dev(self) -> bool:
         return self.app_env == "dev"

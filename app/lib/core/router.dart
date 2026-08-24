@@ -8,6 +8,8 @@ import '../features/buyer/buyer_home_screen.dart';
 import '../features/buyer/buyer_product_screen.dart';
 import '../features/buyer/cart_screen.dart';
 import '../features/buyer/storefront_screen.dart';
+import '../features/campaigns/create_campaign_screen.dart';
+import '../features/campaigns/campaigns_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
 import '../features/notifications/notifications_screen.dart';
 import '../features/home/home_screen.dart';
@@ -24,7 +26,10 @@ import '../features/studio/create_product_screen.dart';
 import '../features/voice/kala_screen.dart';
 
 /// Artisan-only sections. A signed-in buyer hitting these is bounced home.
-const _artisanOnly = {'/home', '/products', '/create', '/market', '/orders', '/dashboard'};
+const _artisanOnly = {
+  '/home', '/products', '/create', '/market', '/orders', '/dashboard',
+  '/campaigns', '/campaigns/create',
+};
 
 /// Buyer-only sections (also matched by prefix, e.g. /buyer/product).
 bool _isBuyerArea(String path) =>
@@ -71,6 +76,8 @@ GoRouter buildRouter(Api api) {
       GoRoute(path: '/market', builder: (c, s) => const MarketScreen()),
       GoRoute(path: '/orders', builder: (c, s) => const OrdersScreen()),
       GoRoute(path: '/dashboard', builder: (c, s) => const DashboardScreen()),
+      GoRoute(path: '/campaigns', builder: (c, s) => const CampaignsScreen()),
+      GoRoute(path: '/campaigns/create', builder: (c, s) => const CreateCampaignScreen()),
       GoRoute(path: '/profile', builder: (c, s) => const ProfileScreen()),
       GoRoute(path: '/settings', builder: (c, s) => const SettingsScreen()),
       GoRoute(path: '/cart', builder: (c, s) => const CartScreen()),

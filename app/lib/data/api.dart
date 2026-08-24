@@ -508,6 +508,31 @@ class Api {
     return Order.fromJson(r.data);
   }
 
+  // ---- ad campaigns (Meta / Google Ads) ----
+  Future<Campaign> createCampaign({
+    required String name,
+    String? productId,
+    String objective = 'OUTCOME_TRAFFIC',
+    double dailyBudget = 200.0,
+    List<String> platforms = const ['meta'],
+  }) async {
+    if (demoMode) return Campaign.fromJson(Demo.newCampaign(name, platforms));
+    final r = await _dio.post('/campaigns', data: {
+      'name': name,
+      'product_id': productId,
+      'objective': objective,
+      'daily_budget': dailyBudget,
+      'platforms': platforms,
+    });
+    return Campaign.fromJson(r.data);
+  }
+
+  Future<List<Campaign>> listCampaigns() async {
+    if (demoMode) return Demo.campaigns.map((e) => Campaign.fromJson(e)).toList();
+    final r = await _dio.get('/campaigns');
+    return _rows(r.data).map(Campaign.fromJson).toList();
+  }
+
   // ---- offline draft sync ----
   /// Flush locally-queued drafts to the server (create + generate listing).
   /// Returns number synced.

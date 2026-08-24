@@ -342,6 +342,52 @@ class AppNotification {
       );
 }
 
+class Campaign {
+  final String id;
+  final String name;
+  final String? productId;
+  final String objective;
+  final double dailyBudget;
+  final List<String> platforms; // "meta" | "google"
+  final String status; // created|failed|archived
+  final Map<String, dynamic> platformIds;
+  final Map<String, dynamic> platformUrls;
+  final String? error;
+
+  Campaign({
+    required this.id,
+    required this.name,
+    this.productId,
+    this.objective = 'OUTCOME_TRAFFIC',
+    this.dailyBudget = 200.0,
+    this.platforms = const [],
+    this.status = 'created',
+    this.platformIds = const {},
+    this.platformUrls = const {},
+    this.error,
+  });
+
+  factory Campaign.fromJson(Map<String, dynamic> j) => Campaign(
+        id: (j['id'] ?? '').toString(),
+        name: j['name'] ?? '',
+        productId: j['product_id'],
+        objective: j['objective'] ?? 'OUTCOME_TRAFFIC',
+        dailyBudget: (j['daily_budget'] as num?)?.toDouble() ?? 200.0,
+        platforms: (j['platforms'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+        status: j['status'] ?? 'created',
+        platformIds: (j['platform_ids'] as Map?)?.cast<String, dynamic>() ?? const {},
+        platformUrls: (j['platform_urls'] as Map?)?.cast<String, dynamic>() ?? const {},
+        error: j['error'],
+      );
+
+  bool get onMeta => platforms.contains('meta');
+  bool get onGoogle => platforms.contains('google');
+
+  /// True if every requested platform actually returned a stub id (no real
+  /// credentials configured yet) — used to show a friendly "demo mode" hint.
+  bool get isStub => platformIds.values.any((v) => v.toString().startsWith('stub_'));
+}
+
 class ArtisanStats {
   final int products;
   final int listed;

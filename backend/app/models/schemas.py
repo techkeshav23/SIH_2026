@@ -315,6 +315,31 @@ class StorefrontOut(BaseModel):
     products: list[ProductOut] = []
 
 
+# ---- Ad campaigns ----
+class CampaignCreate(BaseModel):
+    name: str
+    product_id: str | None = None
+    objective: str = "OUTCOME_TRAFFIC"     # OUTCOME_TRAFFIC | OUTCOME_ENGAGEMENT | OUTCOME_SALES
+    daily_budget: float = 200.0            # INR — informational only, campaign is created PAUSED
+    platforms: list[str] = ["meta"]        # "meta" | "google" | both
+
+
+class CampaignOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    user_id: str
+    product_id: str | None = None
+    name: str
+    objective: str
+    daily_budget: float
+    platforms: list[str] = []
+    status: str
+    platform_ids: dict = {}
+    platform_urls: dict = {}
+    error: str | None = None
+    created_at: datetime
+
+
 # ---- Dashboard ----
 class ArtisanStats(BaseModel):
     products: int

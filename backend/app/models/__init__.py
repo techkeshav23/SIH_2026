@@ -1,6 +1,7 @@
 from app.models.models import (
     Address,
     Buyer,
+    Campaign,
     Inquiry,
     Notification,
     Order,
@@ -26,4 +27,5 @@ __all__ = [
     "Notification",
     "Address",
     "Quote",
+    "Campaign",
 ]

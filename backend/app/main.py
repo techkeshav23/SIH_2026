@@ -12,6 +12,7 @@ from app.api import (
     auth,
     buyer_auth,
     buyers,
+    campaigns,
     community,
     dashboard,
     orders,
@@ -139,6 +140,7 @@ app.include_router(dashboard.router)
 app.include_router(community.router)
 app.include_router(quotes.router)
 app.include_router(voice.router)
+app.include_router(campaigns.router)
 
 # Product images: durable GCS (private bucket, streamed back here) in prod, or
 # the local disk in dev/demo.

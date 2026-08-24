@@ -205,6 +205,32 @@ class Quote(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
 
+class Campaign(Base):
+    """An ad campaign created (PAUSED, never spends) on Meta and/or Google Ads
+    to promote a product. platform_ids holds the provider-assigned campaign id
+    per platform, e.g. {"meta": "1234...", "google": "5678..."}."""
+
+    __tablename__ = "campaigns"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    product_id: Mapped[str | None] = mapped_column(ForeignKey("products.id"), nullable=True, index=True)
+
+    name: Mapped[str] = mapped_column(String)
+    objective: Mapped[str] = mapped_column(String, default="OUTCOME_TRAFFIC")
+    daily_budget: Mapped[float] = mapped_column(Float, default=200.0)  # INR, informational only (paused)
+    platforms: Mapped[list] = mapped_column(JSON, default=list)       # ["meta","google"]
+
+    # created (paused, live in the ad account) | failed | archived
+    status: Mapped[str] = mapped_column(String, default="created", index=True)
+    platform_ids: Mapped[dict] = mapped_column(JSON, default=dict)
+    platform_urls: Mapped[dict] = mapped_column(JSON, default=dict)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+
 class Notification(Base):
     """A per-recipient alert. recipient_id/role stay generic so both artisans
     (users) and buyers can receive notifications without a rigid FK."""

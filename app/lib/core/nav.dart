@@ -125,6 +125,11 @@ class AppDrawer extends ConsumerWidget {
               onTap: () { Navigator.pop(context); context.push('/dashboard'); },
             ),
             _DrawerItem(
+              icon: Icons.campaign_rounded,
+              label: hi ? 'विज्ञापन अभियान' : 'Ad Campaigns',
+              onTap: () { Navigator.pop(context); context.push('/campaigns'); },
+            ),
+            _DrawerItem(
               icon: Icons.storefront_outlined,
               label: hi ? 'बाज़ार झलक' : 'Market preview',
               onTap: () { Navigator.pop(context); context.push('/market'); },

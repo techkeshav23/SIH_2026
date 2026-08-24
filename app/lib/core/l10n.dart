@@ -236,6 +236,27 @@ class T {
     'per_unit': {AppLang.hi: '/यूनिट', AppLang.en: '/unit'},
     'units': {AppLang.hi: 'यूनिट', AppLang.en: 'units'},
     'est_total': {AppLang.hi: 'अनुमानित कुल', AppLang.en: 'Est. total'},
+
+    // ---- ad campaigns ----
+    'campaigns': {AppLang.hi: 'विज्ञापन अभियान', AppLang.en: 'Ad Campaigns'},
+    'create_campaign': {AppLang.hi: 'नया अभियान बनाएं', AppLang.en: 'Create Campaign'},
+    'campaign_name': {AppLang.hi: 'अभियान का नाम', AppLang.en: 'Campaign name'},
+    'choose_product': {AppLang.hi: 'उत्पाद चुनें (वैकल्पिक)', AppLang.en: 'Choose product (optional)'},
+    'choose_platforms': {AppLang.hi: 'प्लेटफ़ॉर्म चुनें', AppLang.en: 'Choose platforms'},
+    'daily_budget': {AppLang.hi: 'दैनिक बजट (₹)', AppLang.en: 'Daily budget (₹)'},
+    'campaign_goal': {AppLang.hi: 'अभियान का लक्ष्य', AppLang.en: 'Campaign goal'},
+    'creating_campaign': {AppLang.hi: 'अभियान बन रहा है…', AppLang.en: 'Creating campaign…'},
+    'campaign_created': {AppLang.hi: 'अभियान बन गया (रुका हुआ)', AppLang.en: 'Campaign created (paused)'},
+    'campaign_paused_note': {AppLang.hi: 'यह अभियान रुका हुआ (PAUSED) बनाया गया है — यह लाइव नहीं होगा और कोई खर्च नहीं होगा। आप इसे Ads Manager में देख सकते हैं और मंज़ूरी मिलने पर खुद चालू करें।', AppLang.en: "This campaign is created PAUSED — it won't go live or spend money. View it in your ad account and resume it yourself when ready."},
+    'select_at_least_one': {AppLang.hi: 'कम से कम एक प्लेटफ़ॉर्म चुनें', AppLang.en: 'Select at least one platform'},
+    'campaign_name_required': {AppLang.hi: 'अभियान का नाम डालें', AppLang.en: 'Enter a campaign name'},
+    'no_campaigns': {AppLang.hi: 'अभी कोई अभियान नहीं', AppLang.en: 'No campaigns yet'},
+    'no_campaigns_sub': {AppLang.hi: 'नीचे बटन दबाकर पहला विज्ञापन अभियान बनाएं।', AppLang.en: 'Tap the button below to create your first ad campaign.'},
+    'view_in_ads_manager': {AppLang.hi: 'Ads Manager में देखें', AppLang.en: 'View in Ads Manager'},
+    'demo_campaign_note': {AppLang.hi: 'डेमो मोड — कोई असली विज्ञापन खाता जुड़ा नहीं', AppLang.en: 'Demo mode — no real ad account connected'},
+    'goal_traffic': {AppLang.hi: 'वेबसाइट पर ट्रैफ़िक', AppLang.en: 'Traffic to your page'},
+    'goal_engagement': {AppLang.hi: 'सहभागिता (लाइक/शेयर)', AppLang.en: 'Engagement (likes/shares)'},
+    'goal_sales': {AppLang.hi: 'बिक्री', AppLang.en: 'Sales'},
   };
 
   static String of(BuildContext context, AppLang lang, String key) {
