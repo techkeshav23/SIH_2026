@@ -105,6 +105,22 @@ def readyz():
     return {"status": "ready"}
 
 
+@app.get("/warmup", tags=["auth"])
+def warmup():
+    """Run one tiny rembg inference to keep the ONNX session hot. A Cloud Scheduler
+    cron pings this every few minutes so a freshly (re)started instance is never
+    cold (~90s first inference) when a real /ai/enhance-image arrives."""
+    if not settings.use_rembg:
+        return {"warm": False, "reason": "rembg disabled"}
+    import time as _t
+
+    from app.services import image_ai
+
+    t0 = _t.perf_counter()
+    image_ai.warmup()
+    return {"warm": True, "ms": int((_t.perf_counter() - t0) * 1000)}
+
+
 app.include_router(auth.router)
 app.include_router(products.router)
 app.include_router(ai.router)
