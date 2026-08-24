@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/api.dart' show kBaseUrl;
 import 'l10n.dart';
 import 'theme.dart';
 
@@ -167,8 +168,12 @@ class KNetImage extends StatelessWidget {
         child: const Center(child: Icon(Icons.image_outlined, color: AppColors.muted)),
       ),
     );
-    final u = url?.trim();
+    var u = url?.trim();
     if (u == null || u.isEmpty) return ph;
+    // Resolve a server-relative path (e.g. "/uploads/x.jpg") so callers that pass
+    // a raw product/quote/order image path — not wrapped in api.mediaUrl — still
+    // load instead of showing the placeholder.
+    if (u.startsWith('/')) u = '$kBaseUrl$u';
     // Decode to the on-screen size, not the source resolution. AI-enhanced
     // product JPEGs are ~1080px; decoding one into a 52px thumbnail wastes
     // ~400x the pixels, janks the raster thread and thrashes the image cache.

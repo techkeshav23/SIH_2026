@@ -183,9 +183,9 @@ class _QuoteCard extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: FilledButton(
-                // can only accept a concrete offer from the other side
-                onPressed: acceptPrice == null ? null : onAccept,
-                child: Text(acceptPrice == null ? t('accept') : '${t('accept')} ${rupees(acceptPrice)}',
+                // can only accept a concrete, positive offer from the other side
+                onPressed: (acceptPrice == null || acceptPrice <= 0) ? null : onAccept,
+                child: Text((acceptPrice == null || acceptPrice <= 0) ? t('accept') : '${t('accept')} ${rupees(acceptPrice)}',
                     maxLines: 1, overflow: TextOverflow.ellipsis),
               ),
             ),

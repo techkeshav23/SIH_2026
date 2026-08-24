@@ -58,10 +58,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     }
     setState(() => _placing = true);
     try {
+      // Drop each line as its order is placed, so a mid-loop failure leaves only
+      // the un-ordered items in the cart — a retry won't duplicate placed orders.
       for (final c in items) {
         await _api.placeOrder(c.product.id, c.qty, addressId: _address?.id);
+        ref.read(cartProvider.notifier).remove(c.product.id);
       }
-      ref.read(cartProvider.notifier).clear();
       messenger.showSnackBar(SnackBar(content: Text(okMsg)));
       if (mounted) context.pop();
     } catch (_) {

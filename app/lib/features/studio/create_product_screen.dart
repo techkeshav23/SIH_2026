@@ -353,10 +353,11 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(p!.titleHi ?? '', style: text.titleMedium),
-                            if ((p.titleEn ?? '').isNotEmpty) ...[
+                            // Primary title in the artisan's selected language.
+                            Text(p!.titleFor(lang == AppLang.hi) ?? '', style: text.titleMedium),
+                            if (((lang == AppLang.hi ? p.titleEn : p.titleHi) ?? '').isNotEmpty) ...[
                               const SizedBox(height: 2),
-                              Text(p.titleEn ?? '', style: text.bodyMedium),
+                              Text((lang == AppLang.hi ? p.titleEn : p.titleHi)!, style: text.bodyMedium),
                             ],
                             if ((p.descHi ?? '').isNotEmpty) ...[
                               Gap.s,
@@ -451,7 +452,14 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
               ),
               Gap.m,
               FilledButton.icon(
-                onPressed: (p != null && _price != null && !_busy) ? _publish : null,
+                // Only publish a complete listing: title + image + price.
+                onPressed: (p != null &&
+                        (p.titleFor(lang == AppLang.hi)?.isNotEmpty ?? false) &&
+                        (p.enhancedImageUrl != null || p.rawImageUrl != null) &&
+                        _price != null &&
+                        !_busy)
+                    ? _publish
+                    : null,
                 icon: const Icon(Icons.storefront),
                 label: Text(T.of(context, lang, 'publish')),
               ),

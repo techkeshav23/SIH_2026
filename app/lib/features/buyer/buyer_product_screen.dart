@@ -42,10 +42,14 @@ class BuyerProductScreen extends ConsumerWidget {
         ),
         child: Row(children: [
           IconButton.outlined(
-            onPressed: () {
-              ref.read(cartProvider.notifier).add(product);
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t('added_to_cart'))));
-            },
+            // No priced offer -> nothing sensible to add to a cart.
+            onPressed: (product.finalPrice ?? product.suggestedPriceMax) == null
+                ? null
+                : () {
+                    ref.read(cartProvider.notifier).add(product);
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(SnackBar(content: Text(t('added_to_cart'))));
+                  },
             icon: const Icon(Icons.add_shopping_cart_rounded),
             style: IconButton.styleFrom(
               minimumSize: const Size(54, 54),

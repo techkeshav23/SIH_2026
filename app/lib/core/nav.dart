@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/api.dart';
+import '../data/cart.dart';
 import 'l10n.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -151,6 +152,7 @@ class AppDrawer extends ConsumerWidget {
                     confirm: hi ? 'लॉग आउट' : 'Logout', danger: true);
                 if (!ok || !context.mounted) return;
                 await api.logout();
+                ref.invalidate(cartProvider); // don't leak the cart into the next account
                 if (context.mounted) context.go('/login');
               },
             ),
