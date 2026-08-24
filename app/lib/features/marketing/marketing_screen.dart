@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/format.dart';
 import '../../core/l10n.dart';
@@ -8,6 +9,7 @@ import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/api.dart';
 import '../../data/models.dart';
+import '../campaigns/campaigns_screen.dart' show campaignsProvider;
 import '../home/home_screen.dart' show productsProvider;
 import '../promote/promote_screen.dart';
 
@@ -23,6 +25,7 @@ class MarketingScreen extends ConsumerWidget {
     final text = Theme.of(context).textTheme;
     final api = ref.read(apiProvider);
     final products = ref.watch(productsProvider);
+    final campaigns = ref.watch(campaignsProvider);
 
     return AppScaffold(
       current: 3,
@@ -30,7 +33,10 @@ class MarketingScreen extends ConsumerWidget {
         KHeader(title: hi ? 'मार्केटिंग' : 'Marketing', leading: drawerButton()),
         Expanded(
           child: RefreshIndicator(
-            onRefresh: () async => ref.invalidate(productsProvider),
+            onRefresh: () async {
+              ref.invalidate(productsProvider);
+              ref.invalidate(campaignsProvider);
+            },
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
@@ -68,22 +74,70 @@ class MarketingScreen extends ConsumerWidget {
                     ]),
                   ]),
                 ),
+                // Running campaigns — boosts created here and campaigns created
+                // from the Ad Campaigns screen both land in GET /campaigns, so
+                // this is the single place the artisan sees what's live.
+                ...campaigns.maybeWhen(
+                  data: (list) => list.isEmpty
+                      ? const <Widget>[]
+                      : <Widget>[
+                          Gap.l,
+                          Row(children: [
+                            Expanded(
+                              child: Text(hi ? 'चल रहे अभियान' : 'Your campaigns',
+                                  style: text.titleMedium),
+                            ),
+                            TextButton(
+                              onPressed: () => context.push('/campaigns'),
+                              style: TextButton.styleFrom(
+                                  minimumSize: const Size(0, 36),
+                                  visualDensity: VisualDensity.compact),
+                              child: Text(hi ? 'सभी देखें' : 'See all'),
+                            ),
+                          ]),
+                          Gap.xs,
+                          for (final c in list.take(3))
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: _CampaignRow(campaign: c, hi: hi),
+                            ),
+                        ],
+                  orElse: () => const <Widget>[],
+                ),
                 Gap.l,
                 Text(hi ? 'किस product का प्रचार करें?' : 'Which product to promote?',
                     style: text.titleMedium),
                 Gap.s,
+                // NOTE: KLoading/KEmpty/KErrorState are Center-based, which resolve
+                // to infinite height inside a ListView (unbounded main axis) and throw
+                // a box.dart layout assertion — killing everything below. Give them a
+                // bounded height here.
                 products.when(
-                  loading: () => const Padding(padding: EdgeInsets.all(24), child: KLoading()),
-                  error: (_, _) => KErrorState(
-                      message: hi ? 'लोड नहीं हुआ' : 'Could not load',
-                      onRetry: () => ref.invalidate(productsProvider)),
+                  loading: () => const SizedBox(height: 220, child: KLoading()),
+                  error: (_, _) => SizedBox(
+                    height: 260,
+                    child: KErrorState(
+                        message: hi ? 'लोड नहीं हुआ' : 'Could not load',
+                        onRetry: () => ref.invalidate(productsProvider)),
+                  ),
                   data: (list) {
                     final items = list.where((p) => p.status != 'archived').toList();
                     if (items.isEmpty) {
-                      return KEmpty(
-                        icon: Icons.inventory_2_outlined,
-                        title: hi ? 'कोई product नहीं' : 'No products yet',
-                        subtitle: hi ? 'पहले एक product जोड़ें' : 'Add a product first',
+                      return SizedBox(
+                        height: 420,
+                        child: KEmpty(
+                          icon: Icons.inventory_2_outlined,
+                          title: hi ? 'कोई product नहीं' : 'No products yet',
+                          subtitle: hi ? 'पहले एक product जोड़ें' : 'Add a product first',
+                          action: FilledButton.icon(
+                            onPressed: () async {
+                              await context.push('/create');
+                              ref.invalidate(productsProvider);
+                            },
+                            icon: const Icon(Icons.add_a_photo_rounded),
+                            label: Text(hi ? 'नया उत्पाद जोड़ें' : 'Add Product'),
+                          ),
+                        ),
                       );
                     }
                     return Column(
@@ -113,6 +167,61 @@ class MarketingScreen extends ConsumerWidget {
         ),
         child: Text(s, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
       );
+}
+
+/// Compact row for a live (PAUSED on the ad platform) campaign.
+class _CampaignRow extends StatelessWidget {
+  const _CampaignRow({required this.campaign, required this.hi});
+  final Campaign campaign;
+  final bool hi;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(Radii.md),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Row(children: [
+        Container(
+          width: 34, height: 34, alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(Radii.sm),
+          ),
+          child: const Icon(Icons.campaign_rounded, size: 18, color: AppColors.primary),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(campaign.name,
+                maxLines: 1, overflow: TextOverflow.ellipsis, style: text.titleSmall),
+            const SizedBox(height: 1),
+            Text(
+              '${campaign.platforms.map((p) => p == 'meta' ? 'Meta' : 'Google Ads').join(' + ')}'
+              ' · ${rupees(campaign.dailyBudget)}/${hi ? 'दिन' : 'day'}'
+              '${campaign.isStub ? (hi ? ' · डेमो' : ' · demo') : ''}',
+              style: text.labelSmall,
+            ),
+          ]),
+        ),
+        // Created PAUSED on purpose — never spends until the artisan resumes it.
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+          decoration: BoxDecoration(
+            color: AppColors.accent.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(Radii.pill),
+          ),
+          child: Text(hi ? 'रुका हुआ' : 'Paused',
+              style: const TextStyle(
+                  color: AppColors.primaryDark, fontSize: 11, fontWeight: FontWeight.w700)),
+        ),
+      ]),
+    );
+  }
 }
 
 class _PromoteRow extends StatelessWidget {
@@ -150,6 +259,11 @@ class _PromoteRow extends StatelessWidget {
             backgroundColor: AppColors.accent,
             foregroundColor: const Color(0xFF3A2A20),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            // The app theme sets minimumSize: Size.fromHeight(54), i.e. INFINITE
+            // width (for full-width buttons). Inside a Row the main axis is
+            // unbounded, so that infinite width is an invalid constraint and
+            // breaks layout for the whole list. Override it with a finite size.
+            minimumSize: const Size(0, 40),
           ),
           icon: const Icon(Icons.campaign_rounded, size: 18),
           label: Text(hi ? 'प्रचार' : 'Promote'),

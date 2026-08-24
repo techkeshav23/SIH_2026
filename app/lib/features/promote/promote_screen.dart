@@ -15,6 +15,7 @@ import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/api.dart';
 import '../../data/models.dart';
+import '../campaigns/campaigns_screen.dart' show campaignsProvider;
 
 /// Promote hub: from a product, either make a free shareable AI poster or boost
 /// it as a paid ad (Meta). UI is fully demo-able; the poster is rendered + shared
@@ -427,6 +428,9 @@ class _BoostScreenState extends ConsumerState<BoostScreen> {
           );
       if (!mounted) return;
       setState(() => _busy = false);
+      // The boost is persisted as a Campaign server-side — refresh so it shows
+      // up in the Marketing screen's "Your campaigns" list right away.
+      ref.invalidate(campaignsProvider);
       final reach = result.estimatedReach.length == 2
           ? '${result.estimatedReach[0]}–${result.estimatedReach[1]}'
           : '$_reachLow–$_reachHigh';

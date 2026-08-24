@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.core.config import settings
 from app.core.db import get_db
-from app.models import Product, User
+from app.models import Campaign, Product, User
 from app.services import language_ai
 
 router = APIRouter(prefix="/promote", tags=["promote"])
@@ -108,8 +108,9 @@ def boost(
         hi_title, p.desc_hi or p.desc_en or "", float(p.final_price or p.suggested_price_max or 0), "hi"
     )
 
+    name = f"KalaSetu — {hi_title}"[:190]
     result = meta_ads.boost_product(
-        name=f"KalaSetu — {hi_title}"[:190],
+        name=name,
         budget_rupees=body.budget_rupees,
         days=body.days,
         audience=body.audience,
@@ -118,4 +119,28 @@ def boost(
     )
     if result.get("status") == "failed":
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, result.get("error", "Meta API error"))
+
+    # Persist it as a Campaign so a boost created here is visible everywhere the
+    # artisan looks (GET /campaigns, the Marketing screen, the product page's
+    # budget-boost card) — same source of truth as POST /campaigns.
+    campaign_id = str(result.get("campaign_id") or "")
+    platform_ids: dict = {"meta": campaign_id} if campaign_id else {}
+    if result.get("ad_id"):
+        platform_ids["meta_ad"] = str(result["ad_id"])
+    c = Campaign(
+        user_id=user.id,
+        product_id=p.id,
+        name=name,
+        objective="OUTCOME_TRAFFIC",
+        # The ad set spends per day; store the per-day rate so the boost card's
+        # "current daily budget" matches what Meta actually has.
+        daily_budget=round(body.budget_rupees / max(body.days, 1), 2),
+        platforms=["meta"],
+        status="created",
+        platform_ids=platform_ids,
+        platform_urls={"meta": result["permalink"]} if result.get("permalink") else {},
+    )
+    db.add(c)
+    db.commit()
+
     return BoostOut(**{k: v for k, v in result.items() if k in BoostOut.model_fields})

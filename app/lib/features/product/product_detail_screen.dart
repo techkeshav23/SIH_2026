@@ -367,6 +367,13 @@ class _BoostCard extends StatelessWidget {
             for (final amount in _quickAmounts)
               OutlinedButton(
                 onPressed: busy ? null : () => onBoost(amount),
+                // Wrap's main axis is unbounded, and the app theme's
+                // minimumSize: Size.fromHeight(54) means infinite width —
+                // invalid here. Pin a finite size.
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 44),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
                 child: Text('+${rupees(amount)}'),
               ),
           ]),

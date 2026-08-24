@@ -220,12 +220,14 @@ class KNetImage extends StatelessWidget {
   }
 }
 
-/// Friendly empty state.
+/// Friendly empty state. Pass [action] (e.g. a FilledButton) to give the user
+/// a way forward instead of a dead end — optional, existing call sites unaffected.
 class KEmpty extends StatelessWidget {
-  const KEmpty({super.key, required this.icon, required this.title, this.subtitle});
+  const KEmpty({super.key, required this.icon, required this.title, this.subtitle, this.action});
   final IconData icon;
   final String title;
   final String? subtitle;
+  final Widget? action;
   @override
   Widget build(BuildContext context) => Center(
         child: Padding(
@@ -243,6 +245,10 @@ class KEmpty extends StatelessWidget {
               if (subtitle != null) ...[
                 const SizedBox(height: 8),
                 Text(subtitle!, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
+              ],
+              if (action != null) ...[
+                const SizedBox(height: 20),
+                action!,
               ],
             ],
           ),

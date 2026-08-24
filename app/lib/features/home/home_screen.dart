@@ -142,11 +142,17 @@ class HomeScreen extends ConsumerWidget {
                       onAction: () => context.go('/products'),
                     ),
                     Gap.s,
+                    // KLoading/KErrorState are Center-based -> infinite height inside
+                    // this ListView (unbounded main axis), which throws a box.dart
+                    // layout assertion. Bound them explicitly.
                     products.when(
-                      loading: () => const Padding(padding: EdgeInsets.all(40), child: KLoading()),
-                      error: (e, _) => KErrorState(
-                          message: hi ? 'सर्वर से संपर्क नहीं हुआ' : 'Could not reach server',
-                          onRetry: () => ref.invalidate(productsProvider)),
+                      loading: () => const SizedBox(height: 208, child: KLoading()),
+                      error: (e, _) => SizedBox(
+                        height: 208,
+                        child: KErrorState(
+                            message: hi ? 'सर्वर से संपर्क नहीं हुआ' : 'Could not reach server',
+                            onRetry: () => ref.invalidate(productsProvider)),
+                      ),
                       data: (items) => items.isEmpty
                           ? _EmptyProducts(hi: hi, onAdd: () async {
                               await context.push('/create');
