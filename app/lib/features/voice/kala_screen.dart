@@ -57,9 +57,10 @@ class _KalaScreenState extends ConsumerState<KalaScreen> {
       _status = _hi ? 'कला आ रही है…' : 'Kala is joining…';
     });
     try {
-      // playback engine: 24 kHz mono PCM16
+      // playback engine: 24 kHz mono PCM16. A lower feed threshold = less buffered
+      // audio = lower latency (4000 frames ≈ 166ms; 8000 added ~330ms of lag).
       await FlutterPcmSound.setup(sampleRate: 24000, channelCount: 1);
-      FlutterPcmSound.setFeedThreshold(8000);
+      FlutterPcmSound.setFeedThreshold(4000);
       FlutterPcmSound.setFeedCallback(_onFeed);
 
       _ws = WebSocketChannel.connect(Uri.parse(_api.voiceWsUrl));
@@ -132,15 +133,21 @@ class _KalaScreenState extends ConsumerState<KalaScreen> {
     }
   }
 
-  /// Pull-based playback: feed queued audio, or a little silence to keep the
-  /// engine's feed loop alive while waiting for the next chunk.
+  /// Pull-based playback. Drain ALL queued audio into the engine at once so the
+  /// buffer never underruns between callbacks (single-chunk feeding left gaps that
+  /// sounded choppy/laggy). Kala's audio streams in real time, so the queue stays
+  /// small — this keeps playback smooth without adding latency. Feed a little
+  /// silence when nothing's queued to keep the feed loop alive.
   void _onFeed(int remainingFrames) {
-    if (_pcmQueue.isNotEmpty) {
-      final chunk = _pcmQueue.removeAt(0);
-      FlutterPcmSound.feed(PcmArrayInt16(bytes: ByteData.sublistView(chunk)));
-    } else {
+    if (_pcmQueue.isEmpty) {
       FlutterPcmSound.feed(PcmArrayInt16(bytes: ByteData(2880))); // ~60ms silence
+      return;
     }
+    final b = BytesBuilder(copy: false);
+    while (_pcmQueue.isNotEmpty) {
+      b.add(_pcmQueue.removeAt(0));
+    }
+    FlutterPcmSound.feed(PcmArrayInt16(bytes: ByteData.sublistView(b.toBytes())));
   }
 
   void _fail() {
