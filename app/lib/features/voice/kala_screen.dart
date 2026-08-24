@@ -30,6 +30,7 @@ class _KalaScreenState extends ConsumerState<KalaScreen> {
   StreamSubscription<Uint8List>? _micSub;
   final List<Uint8List> _pcmQueue = [];
   bool _speaking = false;
+  bool _micMuted = false;
   _Kala _state = _Kala.idle;
   String _status = '';
   String _caption = ''; // live transcript of what Kala is saying
@@ -77,7 +78,9 @@ class _KalaScreenState extends ConsumerState<KalaScreen> {
         noiseSuppress: true,
         autoGain: true,
       ));
-      _micSub = mic.listen((chunk) => _ws?.sink.add(chunk));
+      _micSub = mic.listen((chunk) {
+        if (!_micMuted) _ws?.sink.add(chunk); // muted -> stop streaming mic
+      });
 
       FlutterPcmSound.start();
       if (mounted) {
@@ -158,6 +161,7 @@ class _KalaScreenState extends ConsumerState<KalaScreen> {
     try { await FlutterPcmSound.release(); } catch (_) {}
     _pcmQueue.clear();
     _ws = null;
+    _micMuted = false;
     if (mounted && !keepError) {
       setState(() { _state = _Kala.idle; _speaking = false; _status = ''; });
     }
@@ -211,27 +215,89 @@ class _KalaScreenState extends ConsumerState<KalaScreen> {
             const Spacer(),
             Padding(
               padding: EdgeInsets.fromLTRB(24, 0, 24, 24 + MediaQuery.paddingOf(context).bottom),
-              child: FilledButton.icon(
-                onPressed: _state == _Kala.connecting
-                    ? null
-                    : (live ? () => _teardown() : _start),
-                style: FilledButton.styleFrom(
-                  backgroundColor: live ? AppColors.danger : Colors.white,
-                  foregroundColor: live ? Colors.white : AppColors.primaryDark,
-                  minimumSize: const Size.fromHeight(58),
-                ),
-                icon: Icon(live ? Icons.stop_rounded : Icons.mic_rounded),
-                label: Text(
-                  live
-                      ? (hi ? 'बंद करें' : 'End')
-                      : (hi ? 'कला से बात करें' : 'Talk to Kala'),
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-              ),
+              child: live
+                  // in-call controls: mute mic  +  end (like a call screen)
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _CircleBtn(
+                          icon: _micMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
+                          label: _micMuted ? (hi ? 'म्यूट' : 'Muted') : (hi ? 'माइक' : 'Mic'),
+                          bg: _micMuted ? Colors.white24 : Colors.white,
+                          fg: _micMuted ? Colors.white : AppColors.primaryDark,
+                          onTap: _state == _Kala.connecting
+                              ? null
+                              : () => setState(() {
+                                    _micMuted = !_micMuted;
+                                    _status = _micMuted
+                                        ? (hi ? 'माइक बंद है' : 'Mic muted')
+                                        : (hi ? 'बोलिए…' : 'Speak…');
+                                  }),
+                        ),
+                        const SizedBox(width: 30),
+                        _CircleBtn(
+                          icon: Icons.call_end_rounded,
+                          label: hi ? 'बंद' : 'End',
+                          bg: AppColors.danger,
+                          fg: Colors.white,
+                          onTap: () => _teardown(),
+                        ),
+                      ],
+                    )
+                  : FilledButton.icon(
+                      onPressed: _start,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: AppColors.primaryDark,
+                        minimumSize: const Size.fromHeight(58),
+                      ),
+                      icon: const Icon(Icons.mic_rounded),
+                      label: Text(hi ? 'कला से बात करें' : 'Talk to Kala',
+                          style: const TextStyle(fontWeight: FontWeight.w800)),
+                    ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// A round call-control button (icon + caption), like a phone-call screen.
+class _CircleBtn extends StatelessWidget {
+  const _CircleBtn({
+    required this.icon,
+    required this.label,
+    required this.bg,
+    required this.fg,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
+  final Color bg;
+  final Color fg;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Material(
+          color: bg,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Icon(icon, color: fg, size: 28),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(label, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600)),
+      ],
     );
   }
 }
