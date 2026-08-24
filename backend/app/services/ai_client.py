@@ -54,7 +54,11 @@ def build_client():
     from google import genai
     from google.genai import types
 
-    http = types.HttpOptions(timeout=TIMEOUT_MS)
+    # Disable google-genai's INTERNAL retry: on a retryable error it closes the
+    # httpx client and then re-raises 'client has been closed', masking the real
+    # error and breaking worker-thread calls. We keep our own _with_retry (fresh
+    # client each attempt) instead, and the true error now surfaces in the logs.
+    http = types.HttpOptions(timeout=TIMEOUT_MS, retry_options=types.HttpRetryOptions(attempts=1))
     if settings.use_vertex:
         # Auth via Application Default Credentials:
         #   gcloud auth application-default login   (dev)
