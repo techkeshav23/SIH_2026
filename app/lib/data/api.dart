@@ -609,28 +609,6 @@ class Api {
     }
   }
 
-  /// Boost a product as a real (PAUSED — never spends) Meta ad campaign. See
-  /// docs/PROMOTE_ADS_API.md for the backend contract.
-  Future<BoostResult> boostProduct({
-    required String productId,
-    required double budgetRupees,
-    required int days,
-    required String audience,   // "nearby" | "india"
-    required String imageSource, // "poster" | "studio" | "gallery"
-  }) async {
-    if (demoMode) {
-      return BoostResult.fromJson(Demo.boostProduct(budgetRupees, days));
-    }
-    final r = await _dio.post('/promote/boost', data: {
-      'product_id': productId,
-      'budget_rupees': budgetRupees,
-      'days': days,
-      'audience': audience,
-      'image_source': imageSource,
-    });
-    return BoostResult.fromJson(r.data);
-  }
-
   /// WebSocket URL for the Kala voice agent (http->ws, https->wss), with the
   /// artisan's access token so the backend can scope tools to them.
   String get voiceWsUrl =>

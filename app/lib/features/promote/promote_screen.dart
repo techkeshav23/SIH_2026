@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+// (No ImagePicker here — that was only used by the old in-screen Boost flow,
+// removed in favour of the Ad Campaigns form, which has its own image UI.)
 
 import '../../core/format.dart';
 import '../../core/l10n.dart';
@@ -15,11 +17,10 @@ import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/api.dart';
 import '../../data/models.dart';
-import '../campaigns/campaigns_screen.dart' show campaignsProvider;
 
-/// Promote hub: from a product, either make a free shareable AI poster or boost
-/// it as a paid ad (Meta). UI is fully demo-able; the poster is rendered + shared
-/// on-device (real), the Boost flow calls the backend (friend wires Meta).
+/// Promote hub: from a product, either make a free shareable AI poster, or
+/// jump into the Ad Campaigns flow (Meta) already scoped to this product.
+/// The poster is rendered + shared entirely on-device.
 class PromoteScreen extends ConsumerWidget {
   const PromoteScreen({super.key, required this.product});
   final Product product;
@@ -76,8 +77,10 @@ class PromoteScreen extends ConsumerWidget {
                 : 'Run ads on Facebook · Instagram',
             badge: hi ? 'पेड' : 'PAID',
             badgeColor: AppColors.primary,
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => BoostScreen(product: product))),
+            // The real ad-campaign flow lives in one place (Ad Campaigns,
+            // reachable from the drawer) — jump there pre-filled for this
+            // product instead of duplicating a second boost form here.
+            onTap: () => context.push('/campaigns/create', extra: product),
           ),
         ],
       ),
@@ -383,230 +386,4 @@ class _PosterCard extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BOOST — configure a paid ad (image source, budget, days, audience). The
-// "Boost now" call hits the backend the friend will wire to the Meta Ads API.
-// ─────────────────────────────────────────────────────────────────────────────
-class BoostScreen extends ConsumerStatefulWidget {
-  const BoostScreen({super.key, required this.product});
-  final Product product;
-  @override
-  ConsumerState<BoostScreen> createState() => _BoostScreenState();
-}
 
-enum _AdImage { poster, studio, gallery }
-
-class _BoostScreenState extends ConsumerState<BoostScreen> {
-  _AdImage _source = _AdImage.studio;
-
-  /// Per-DAY budget, not a total. Meta charges per day and enforces a ~₹97/day
-  /// floor, so picking a small total and spreading it over a week would silently
-  /// be raised to the floor (e.g. "₹100 over 7 days" would really cost ~₹679).
-  /// Choosing the daily rate and showing the derived total keeps it honest.
-  int _dailyBudget = 100;
-  int _days = 5;
-  String _audience = 'nearby';
-  String? _galleryPath;
-  bool _busy = false;
-
-  int get _total => _dailyBudget * _days;
-  int get _reachLow => (_total * 1.4).round();
-  int get _reachHigh => (_total * 3.2).round();
-
-  Future<void> _pickGallery() async {
-    final f = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 90);
-    if (f != null) setState(() { _galleryPath = f.path; _source = _AdImage.gallery; });
-  }
-
-  Future<void> _boost(bool hi) async {
-    setState(() => _busy = true);
-    try {
-      final result = await ref.read(apiProvider).boostProduct(
-            // The API takes the total; sending daily*days means the backend's
-            // total/days lands back on exactly the rate shown here.
-            productId: widget.product.id,
-            budgetRupees: _total.toDouble(),
-            days: _days,
-            audience: _audience,
-            imageSource: switch (_source) {
-              _AdImage.poster => 'poster',
-              _AdImage.studio => 'studio',
-              _AdImage.gallery => 'gallery',
-            },
-          );
-      if (!mounted) return;
-      setState(() => _busy = false);
-      // The boost is persisted as a Campaign server-side — refresh so it shows
-      // up in the Marketing screen's "Your campaigns" list right away.
-      ref.invalidate(campaignsProvider);
-      final reach = result.estimatedReach.length == 2
-          ? '${result.estimatedReach[0]}–${result.estimatedReach[1]}'
-          : '$_reachLow–$_reachHigh';
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          icon: const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 40),
-          title: Text(hi ? 'विज्ञापन बन गया' : 'Ad created'),
-          content: Text(
-            hi
-                ? 'आपका विज्ञापन Facebook/Instagram खाते में रुका हुआ (paused) बना है — '
-                    'जब आप चालू करेंगे तभी चलेगा और खर्च होगा।\n\n'
-                    'अनुमानित पहुँच: $reach लोग।'
-                : 'Your ad was created in your Facebook/Instagram account and is '
-                    'paused — it only runs and spends once you resume it.\n\n'
-                    'Estimated reach: $reach people.',
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () { Navigator.pop(context); Navigator.pop(context); },
-              child: Text(hi ? 'ठीक है' : 'OK'),
-            ),
-          ],
-        ),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(hi ? 'Boost नहीं हो सका — फिर कोशिश करें' : 'Could not boost — please try again')));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final lang = ref.watch(langProvider);
-    final hi = lang == AppLang.hi;
-    final text = Theme.of(context).textTheme;
-    final api = ref.read(apiProvider);
-    final img = widget.product.enhancedImageUrl ?? widget.product.rawImageUrl;
-    final preview = _source == _AdImage.gallery && _galleryPath != null
-        ? null
-        : (img == null ? null : api.mediaUrl(img));
-
-    return Scaffold(
-      appBar: AppBar(title: Text(hi ? 'Boost करें' : 'Boost')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // ad preview
-          Center(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(Radii.md),
-              child: _source == _AdImage.gallery && _galleryPath != null
-                  ? Image.file(File(_galleryPath!), width: 220, height: 220, fit: BoxFit.cover)
-                  : KNetImage(preview, width: 220, height: 220),
-            ),
-          ),
-          Gap.m,
-          _label(hi ? 'विज्ञापन की तस्वीर' : 'Ad image'),
-          Gap.s,
-          _choiceRow([
-            (hi ? 'AI पोस्टर' : 'AI Poster', _source == _AdImage.poster,
-                () => setState(() => _source = _AdImage.poster)),
-            (hi ? 'Studio फ़ोटो' : 'Studio photo', _source == _AdImage.studio,
-                () => setState(() => _source = _AdImage.studio)),
-            (hi ? 'गैलरी' : 'Gallery', _source == _AdImage.gallery, _pickGallery),
-          ]),
-          Gap.l,
-          _label(hi ? 'रोज़ का बजट' : 'Daily budget'),
-          Gap.s,
-          // Meta's floor is ~₹97/day, so ₹100 is the lowest honest option.
-          _choiceRow([
-            for (final b in [100, 250, 500])
-              ('₹$b', _dailyBudget == b, () => setState(() => _dailyBudget = b)),
-          ]),
-          Gap.l,
-          _label(hi ? 'कितने दिन' : 'Duration'),
-          Gap.s,
-          _choiceRow([
-            for (final d in [3, 5, 7])
-              ('$d ${hi ? 'दिन' : 'days'}', _days == d, () => setState(() => _days = d)),
-          ]),
-          Gap.l,
-          _label(hi ? 'किसे दिखे' : 'Audience'),
-          Gap.s,
-          _choiceRow([
-            (hi ? 'आस-पास' : 'Nearby', _audience == 'nearby',
-                () => setState(() => _audience = 'nearby')),
-            (hi ? 'पूरे भारत' : 'All India', _audience == 'india',
-                () => setState(() => _audience = 'india')),
-          ]),
-          Gap.l,
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.success.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(Radii.md),
-              border: Border.all(color: AppColors.success.withValues(alpha: 0.25)),
-            ),
-            child: Column(children: [
-              Text(hi ? 'अनुमानित पहुँच' : 'Estimated reach', style: text.labelSmall),
-              Gap.xs,
-              Text('$_reachLow – $_reachHigh ${hi ? 'लोग' : 'people'}',
-                  style: text.titleLarge?.copyWith(color: AppColors.success, fontWeight: FontWeight.w800)),
-              // Show the derived total, so "₹100/day × 5 days = ₹500" is explicit
-              // rather than the artisan guessing what they committed to.
-              Text(
-                  '₹$_dailyBudget/${hi ? 'दिन' : 'day'} × $_days ${hi ? 'दिन' : 'days'}'
-                  ' = ₹$_total ${hi ? 'कुल' : 'total'}',
-                  style: text.bodySmall),
-            ]),
-          ),
-          Gap.l,
-          FilledButton.icon(
-            onPressed: _busy ? null : () => _boost(hi),
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54)),
-            icon: _busy
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Icon(Icons.rocket_launch_rounded),
-            label: Text('${hi ? 'Boost करें' : 'Boost now'} · ₹$_total'),
-          ),
-          Gap.s,
-          // The ad is created PAUSED — nothing is charged until the artisan
-          // resumes it in Ads Manager. Saying "secure payment" would imply a
-          // charge that never happens.
-          Text(
-              hi
-                  ? 'विज्ञापन रुका हुआ बनेगा — आपकी मंज़ूरी तक कोई खर्च नहीं'
-                  : "Created paused — nothing is charged until you resume it",
-              textAlign: TextAlign.center,
-              style: text.labelSmall?.copyWith(color: AppColors.muted)),
-        ],
-      ),
-    );
-  }
-
-  Widget _label(String s) => Text(s, style: Theme.of(context).textTheme.titleSmall);
-
-  /// Row of equal-width choice chips (Expanded must be a direct Row child, so we
-  /// interleave SizedBox spacers here — never wrap an Expanded in a Padding).
-  Widget _choiceRow(List<(String, bool, VoidCallback)> opts) {
-    final children = <Widget>[];
-    for (var i = 0; i < opts.length; i++) {
-      if (i > 0) children.add(const SizedBox(width: 8));
-      children.add(Expanded(child: _choice(opts[i].$1, opts[i].$2, opts[i].$3)));
-    }
-    return Row(children: children);
-  }
-
-  Widget _choice(String label, bool sel, VoidCallback onTap) => InkWell(
-        borderRadius: BorderRadius.circular(Radii.md),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: sel ? AppColors.primary.withValues(alpha: 0.10) : AppColors.surface,
-            borderRadius: BorderRadius.circular(Radii.md),
-            border: Border.all(color: sel ? AppColors.primary : AppColors.line, width: sel ? 1.6 : 1.2),
-          ),
-          child: Text(label,
-              textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                  color: sel ? AppColors.primary : AppColors.text,
-                  fontWeight: sel ? FontWeight.w800 : FontWeight.w600,
-                  fontSize: 13.5)),
-        ),
-      );
-}

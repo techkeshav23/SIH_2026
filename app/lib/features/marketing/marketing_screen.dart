@@ -202,7 +202,9 @@ class _CampaignRow extends StatelessWidget {
             const SizedBox(height: 1),
             Text(
               '${rupees(campaign.dailyBudget)}/${hi ? 'दिन' : 'day'}'
+              ' · ${timeAgo(campaign.createdAt, hi: hi)}'
               '${campaign.isStub ? (hi ? ' · डेमो' : ' · demo') : ''}',
+              maxLines: 1, overflow: TextOverflow.ellipsis,
               style: text.labelSmall,
             ),
           ]),

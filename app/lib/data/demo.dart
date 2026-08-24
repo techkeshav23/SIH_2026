@@ -317,21 +317,6 @@ class Demo {
     return q;
   }
 
-  // ---- promote / boost (demo) ----
-  static Map<String, dynamic> boostProduct(double budgetRupees, int days) {
-    final low = (budgetRupees * 1.4).round();
-    final high = (budgetRupees * 3.2).round();
-    return {
-      'status': 'paused',
-      'campaign_id': 'demo_campaign_${_seq++}',
-      'ad_id': 'demo_ad_${_seq++}',
-      'daily_budget': budgetRupees / (days == 0 ? 1 : days),
-      'estimated_reach': [low, high],
-      'permalink': null,
-      'note': null,
-    };
-  }
-
   // ---- ad campaigns (Meta / Google Ads) ----
   static final List<Map<String, dynamic>> campaigns = [];
 
@@ -351,6 +336,7 @@ class Demo {
       'objective': 'OUTCOME_TRAFFIC', 'daily_budget': 200.0,
       'platforms': platforms, 'status': 'paused',
       'platform_ids': ids, 'platform_urls': <String, dynamic>{}, 'error': null,
+      'created_at': DateTime.now().toIso8601String(),
     };
     campaigns.insert(0, c);
     return c;

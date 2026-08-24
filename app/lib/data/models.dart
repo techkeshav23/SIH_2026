@@ -342,41 +342,6 @@ class AppNotification {
       );
 }
 
-/// Response from POST /promote/boost (docs/PROMOTE_ADS_API.md). The ad is always
-/// created PAUSED on the platform, so `status` is 'paused' on success.
-class BoostResult {
-  final String status; // paused | failed
-  final String? campaignId;
-  final String? adId;
-  final double dailyBudget;
-  final List<int> estimatedReach;
-  final String? permalink;
-  /// Why the image/creative layer was skipped, when it was — surfaced so the
-  /// artisan isn't left wondering where their photo went.
-  final String? note;
-
-  BoostResult({
-    required this.status,
-    this.campaignId,
-    this.adId,
-    this.dailyBudget = 0,
-    this.estimatedReach = const [],
-    this.permalink,
-    this.note,
-  });
-
-  factory BoostResult.fromJson(Map<String, dynamic> j) => BoostResult(
-        status: j['status'] ?? 'paused',
-        campaignId: j['campaign_id'],
-        adId: j['ad_id'],
-        dailyBudget: (j['daily_budget'] as num?)?.toDouble() ?? 0,
-        estimatedReach:
-            (j['estimated_reach'] as List?)?.map((e) => (e as num).toInt()).toList() ?? const [],
-        permalink: j['permalink'],
-        note: j['note'],
-      );
-}
-
 class Campaign {
   final String id;
   final String name;
@@ -384,10 +349,11 @@ class Campaign {
   final String objective;
   final double dailyBudget;
   final List<String> platforms; // "meta" | "google"
-  final String status; // created|failed|archived
+  final String status; // paused|failed
   final Map<String, dynamic> platformIds;
   final Map<String, dynamic> platformUrls;
   final String? error;
+  final DateTime? createdAt;
 
   Campaign({
     required this.id,
@@ -396,10 +362,11 @@ class Campaign {
     this.objective = 'OUTCOME_TRAFFIC',
     this.dailyBudget = 200.0,
     this.platforms = const [],
-    this.status = 'created',
+    this.status = 'paused',
     this.platformIds = const {},
     this.platformUrls = const {},
     this.error,
+    this.createdAt,
   });
 
   factory Campaign.fromJson(Map<String, dynamic> j) => Campaign(
@@ -409,10 +376,11 @@ class Campaign {
         objective: j['objective'] ?? 'OUTCOME_TRAFFIC',
         dailyBudget: (j['daily_budget'] as num?)?.toDouble() ?? 200.0,
         platforms: (j['platforms'] as List?)?.map((e) => e.toString()).toList() ?? const [],
-        status: j['status'] ?? 'created',
+        status: j['status'] ?? 'paused',
         platformIds: (j['platform_ids'] as Map?)?.cast<String, dynamic>() ?? const {},
         platformUrls: (j['platform_urls'] as Map?)?.cast<String, dynamic>() ?? const {},
         error: j['error'],
+        createdAt: DateTime.tryParse(j['created_at']?.toString() ?? ''),
       );
 
   bool get onMeta => platforms.contains('meta');

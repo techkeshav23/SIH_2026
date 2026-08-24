@@ -78,7 +78,12 @@ GoRouter buildRouter(Api api) {
       GoRoute(path: '/orders', builder: (c, s) => const OrdersScreen()),
       GoRoute(path: '/dashboard', builder: (c, s) => const DashboardScreen()),
       GoRoute(path: '/campaigns', builder: (c, s) => const CampaignsScreen()),
-      GoRoute(path: '/campaigns/create', builder: (c, s) => const CreateCampaignScreen()),
+      GoRoute(
+        path: '/campaigns/create',
+        // Optional Product passed as `extra` (e.g. from a product's Promote
+        // hub) so the campaign is prefilled for that product.
+        builder: (c, s) => CreateCampaignScreen(initialProduct: s.extra as Product?),
+      ),
       GoRoute(path: '/marketing', builder: (c, s) => const MarketingScreen()),
       GoRoute(path: '/profile', builder: (c, s) => const ProfileScreen()),
       GoRoute(path: '/settings', builder: (c, s) => const SettingsScreen()),

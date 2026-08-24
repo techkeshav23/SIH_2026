@@ -263,6 +263,8 @@ class T {
     'goal_sales': {AppLang.hi: 'बिक्री', AppLang.en: 'Sales'},
     'boost_ad_budget': {AppLang.hi: 'विज्ञापन बजट बढ़ाएं', AppLang.en: 'Boost ad budget'},
     'boost_ad_sub': {AppLang.hi: 'यह उत्पाद विज्ञापन अभियान में है — बजट बढ़ाकर ज़्यादा लोगों तक पहुंचें', AppLang.en: 'This product is being promoted — increase the budget to reach more buyers'},
+    'running_ads': {AppLang.hi: 'इस उत्पाद पर चल रहे विज्ञापन', AppLang.en: 'Ads running on this product'},
+    'created_on': {AppLang.hi: 'बनाया गया' , AppLang.en: 'Created'},
     'current_budget': {AppLang.hi: 'मौजूदा दैनिक बजट', AppLang.en: 'Current daily budget'},
     'increase_by': {AppLang.hi: 'बढ़ाएं', AppLang.en: 'Increase by'},
     'boosting': {AppLang.hi: 'बजट बढ़ाया जा रहा है…', AppLang.en: 'Boosting budget…'},

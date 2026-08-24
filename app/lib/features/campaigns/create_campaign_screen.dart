@@ -9,13 +9,19 @@ import '../../core/widgets.dart';
 import '../../data/api.dart';
 import '../../data/models.dart';
 import '../home/home_screen.dart' show productsProvider;
+import 'campaigns_screen.dart' show campaignsProvider;
 
 /// Create a real, PAUSED campaign on Meta and/or Google Ads for one of the
 /// artisan's products (or a general shop promo). PAUSED means it's visible in
 /// the artisan's own ad account but never goes live / spends money — safe to
 /// demo. See backend app/services/meta_ads.py + app/api/campaigns.py.
+///
+/// Pass [initialProduct] to land here already scoped to one product (e.g. from
+/// the product's own Promote hub) — the name and product picker are prefilled
+/// so that context isn't lost, but everything stays editable.
 class CreateCampaignScreen extends ConsumerStatefulWidget {
-  const CreateCampaignScreen({super.key});
+  const CreateCampaignScreen({super.key, this.initialProduct});
+  final Product? initialProduct;
   @override
   ConsumerState<CreateCampaignScreen> createState() => _CreateCampaignScreenState();
 }
@@ -31,6 +37,19 @@ class _CreateCampaignScreenState extends ConsumerState<CreateCampaignScreen> {
   Campaign? _result;
 
   Api get _api => ref.read(apiProvider);
+
+  @override
+  void initState() {
+    super.initState();
+    final p = widget.initialProduct;
+    if (p != null) {
+      _productId = p.id;
+      // Language isn't known yet at initState — a plain fallback here is fine,
+      // the artisan can freely edit the name either way.
+      final title = p.titleFor(false) ?? p.titleFor(true);
+      if (title != null && title.isNotEmpty) _nameCtrl.text = '$title — Promo';
+    }
+  }
 
   @override
   void dispose() {
@@ -81,6 +100,8 @@ class _CreateCampaignScreenState extends ConsumerState<CreateCampaignScreen> {
         platforms: _platforms.toList(),
       );
       setState(() => _result = c);
+      // So Marketing / the product's "running ads" list show it right away.
+      ref.invalidate(campaignsProvider);
     } catch (_) {
       _snack(hi ? 'अभियान नहीं बन सका — फिर कोशिश करें' : 'Could not create campaign — please try again');
     } finally {

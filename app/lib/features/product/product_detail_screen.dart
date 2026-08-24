@@ -274,7 +274,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                     formatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))]),
                 if (p.status == 'listed' && _campaigns.isNotEmpty) ...[
                   Gap.l,
-                  KSectionTitle(T.of(context, lang, 'boost_ad_budget')),
+                  KSectionTitle(T.of(context, lang, 'running_ads')),
                   Gap.s,
                   for (final c in _campaigns)
                     Padding(
@@ -294,14 +294,19 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                         child: Text(T.of(context, lang, 'save')),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: _saving ? null : () => _save(publish: true),
-                        icon: const Icon(Icons.storefront),
-                        label: Text(T.of(context, lang, 'publish')),
+                    // "List on Market" only makes sense before it's listed —
+                    // once live, re-showing it implies the product isn't public
+                    // yet and just re-runs the same publish flow pointlessly.
+                    if (p.status != 'listed') ...[
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _saving ? null : () => _save(publish: true),
+                          icon: const Icon(Icons.storefront),
+                          label: Text(T.of(context, lang, 'publish')),
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
                 Gap.xl,
@@ -324,9 +329,10 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       );
 }
 
-/// "This product is being promoted — boost its ad budget" card, shown per
-/// active campaign on a listed product. Minimum bump is ₹250 (enforced here
-/// and again server-side in POST /campaigns/{id}/boost).
+/// A single ad running on this product — leads with "this is a real running
+/// ad" (name, platform, when it was created, live/paused status), then offers
+/// a quick daily-budget bump. Minimum bump is ₹100 (enforced here and again
+/// server-side in POST /campaigns/{id}/boost).
 class _BoostCard extends StatelessWidget {
   const _BoostCard({required this.c, required this.lang, required this.busy, required this.onBoost});
   final Campaign c;
@@ -342,26 +348,74 @@ class _BoostCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hi = lang == AppLang.hi;
     final text = Theme.of(context).textTheme;
-    final platformLabel = c.platforms.map((p) => p == 'meta' ? 'Meta' : 'Google Ads').join(' + ');
     return KCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            const Icon(Icons.trending_up_rounded, color: AppColors.primary, size: 20),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: text.titleMedium),
+          // Header: unmistakably "this is a running ad", not a form.
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+              width: 38, height: 38, alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: (c.isStub ? AppColors.muted : AppColors.success).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(Radii.sm),
+              ),
+              child: Icon(Icons.campaign_rounded, size: 19,
+                  color: c.isStub ? AppColors.muted : AppColors.success),
             ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: text.titleSmall),
+                const SizedBox(height: 2),
+                Row(children: [
+                  Icon(Icons.facebook_rounded, size: 13, color: AppColors.muted),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      '${c.platformLabel} · ${T.of(context, lang, 'created_on')} ${createdOn(c.createdAt)}',
+                      maxLines: 1, overflow: TextOverflow.ellipsis, style: text.labelSmall,
+                    ),
+                  ),
+                ]),
+              ]),
+            ),
+            KStatusPill(c.status),
           ]),
-          const SizedBox(height: 2),
-          Text(platformLabel, style: text.labelSmall),
-          Gap.s,
+          Gap.m,
+          const Divider(height: 1),
+          Gap.m,
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text(T.of(context, lang, 'current_budget'), style: text.bodyMedium),
-            Text(rupees(c.dailyBudget),
-                style: text.titleMedium?.copyWith(color: AppColors.primary, fontWeight: FontWeight.w800)),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(T.of(context, lang, 'current_budget'), style: text.labelSmall),
+              Text('${rupees(c.dailyBudget)} / ${hi ? 'दिन' : 'day'}',
+                  style: text.titleMedium?.copyWith(color: AppColors.primary, fontWeight: FontWeight.w800)),
+            ]),
+            if ((c.error ?? '').isEmpty)
+              Row(children: [
+                Icon(
+                  c.isStub ? Icons.science_outlined : Icons.pause_circle_outline_rounded,
+                  size: 15,
+                  color: c.isStub ? AppColors.muted : AppColors.accent,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  c.isStub
+                      ? T.of(context, lang, 'demo_campaign_note')
+                      : (hi ? 'खर्च नहीं हो रहा (रुका हुआ)' : 'No spend while paused'),
+                  style: text.labelSmall,
+                ),
+              ]),
           ]),
+          // Surface why an image/creative was skipped instead of hiding it.
+          if ((c.error ?? '').isNotEmpty) ...[
+            Gap.s,
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Icon(Icons.info_outline_rounded, size: 14, color: AppColors.muted),
+              const SizedBox(width: 6),
+              Expanded(child: Text(c.error!, style: text.labelSmall, maxLines: 3)),
+            ]),
+          ],
           Gap.m,
           Text(T.of(context, lang, 'increase_by'), style: text.labelSmall),
           Gap.xs,
@@ -379,22 +433,6 @@ class _BoostCard extends StatelessWidget {
                 child: Text('+${rupees(amount)}'),
               ),
           ]),
-          if (c.isStub) ...[
-            Gap.s,
-            Row(children: [
-              const Icon(Icons.science_outlined, size: 13, color: AppColors.muted),
-              const SizedBox(width: 5),
-              Text(T.of(context, lang, 'demo_campaign_note'), style: text.labelSmall),
-            ]),
-          ],
-          if (!c.isStub) ...[
-            Gap.xs,
-            Text(
-                hi
-                    ? 'असली विज्ञापन खाते के ad set पर लागू होगा — अभियान रुका हुआ रहेगा'
-                    : "Applied to the ad set in your real ad account — the campaign stays paused",
-                style: text.labelSmall),
-          ],
         ],
       ),
     );
