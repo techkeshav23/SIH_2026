@@ -10,6 +10,7 @@ import '../../core/tts.dart';
 import '../../core/widgets.dart';
 import '../../data/api.dart';
 import '../../data/models.dart';
+import '../promote/promote_screen.dart';
 
 /// View + edit a product's AI-generated listing, set final price, and publish.
 class ProductDetailScreen extends ConsumerStatefulWidget {
@@ -180,6 +181,19 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                     width: double.infinity,
                     radius: Radii.lg,
                   ),
+                Gap.m,
+                // Promote: make a poster to share, or boost as an ad.
+                FilledButton.icon(
+                  onPressed: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => PromoteScreen(product: p))),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: const Color(0xFF3A2A20),
+                    minimumSize: const Size.fromHeight(50),
+                  ),
+                  icon: const Icon(Icons.campaign_rounded),
+                  label: Text(lang == AppLang.hi ? 'प्रचार करें (पोस्टर / विज्ञापन)' : 'Promote (poster / ad)'),
+                ),
                 Gap.m,
                 KSectionTitle(T.of(context, lang, 'listing')),
                 Gap.s,
