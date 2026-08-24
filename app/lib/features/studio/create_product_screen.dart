@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -15,7 +16,9 @@ import '../../data/api.dart';
 import '../../data/local_store.dart';
 import '../../data/models.dart';
 
-/// The hero flow: photo -> AI enhance -> voice/text -> AI listing -> price -> publish.
+/// The hero flow as a step-by-step wizard: photo -> AI enhance -> describe
+/// (voice/text) -> AI listing -> price (AI suggestion the artisan can edit) ->
+/// review -> publish. One step per screen with Back/Next navigation.
 class CreateProductScreen extends ConsumerStatefulWidget {
   const CreateProductScreen({super.key});
   @override
@@ -25,7 +28,11 @@ class CreateProductScreen extends ConsumerStatefulWidget {
 class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
   final _picker = ImagePicker();
   final _textCtrl = TextEditingController();
+  final _priceCtrl = TextEditingController();
   final _recorder = AudioRecorder();
+
+  static const _steps = 4; // 0 photo, 1 details, 2 price, 3 review
+  int _step = 0;
 
   Product? _product;
   bool _busy = false;
@@ -39,6 +46,7 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
   void dispose() {
     _recorder.dispose();
     _textCtrl.dispose();
+    _priceCtrl.dispose();
     super.dispose();
   }
 
@@ -208,11 +216,37 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
       await _ensureProduct();
       final price = await _api.suggestPrice(_product!.id);
       final p = await _api.getProduct(_product!.id);
-      setState(() { _price = price; _product = p; });
+      setState(() {
+        _price = price;
+        _product = p;
+        // Pre-fill the editable price with the AI's upper estimate — the artisan
+        // can accept it or type their own. Don't overwrite a manual entry.
+        if (_priceValue == null) _priceCtrl.text = price.max.round().toString();
+      });
     } catch (_) {
       _snack(lang == AppLang.hi ? 'क़ीमत नहीं मिली — फिर कोशिश करें' : 'Could not fetch price — please try again');
     } finally {
       if (mounted) setState(() { _busy = false; _status = ''; });
+    }
+  }
+
+  /// The artisan's chosen final price, or null if not a valid positive number.
+  double? get _priceValue {
+    final v = double.tryParse(_priceCtrl.text.trim());
+    return (v != null && v > 0) ? v : null;
+  }
+
+  bool _stepComplete(int step, bool hi) {
+    final p = _product;
+    switch (step) {
+      case 0:
+        return p != null && (p.enhancedImageUrl != null || p.rawImageUrl != null);
+      case 1:
+        return p != null && (p.titleFor(hi)?.isNotEmpty ?? false);
+      case 2:
+        return _priceValue != null;
+      default:
+        return true;
     }
   }
 
@@ -225,7 +259,8 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
     if (!ok) return;
     setState(() { _busy = true; _status = T.of(context, lang, 'processing'); });
     try {
-      await _api.updateProduct(_product!.id, {'status': 'listed'});
+      // Persist the artisan's chosen final price along with going live.
+      await _api.updateProduct(_product!.id, {'status': 'listed', 'final_price': _priceValue});
       if (mounted) context.pop();
     } catch (_) {
       _snack(lang == AppLang.hi ? 'लिस्ट नहीं हो सका — फिर कोशिश करें' : 'Could not list — please try again');
@@ -237,232 +272,66 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
   @override
   Widget build(BuildContext context) {
     final lang = ref.watch(langProvider);
-    final text = Theme.of(context).textTheme;
-    final p = _product;
+    final hi = lang == AppLang.hi;
+    final labels = hi
+        ? const ['फ़ोटो', 'जानकारी', 'क़ीमत', 'समीक्षा']
+        : const ['Photo', 'Details', 'Price', 'Review'];
+    final isLast = _step == _steps - 1;
+    final canNext = _stepComplete(_step, hi);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(T.of(context, lang, 'add_product')),
         actions: [
-          KSpeak(lang == AppLang.hi
-              ? 'फ़ोटो खींचें, आवाज़ या टाइप करके बताएं, फिर क़ीमत सुझाएं'
-              : 'Take a photo, describe by voice or typing, then suggest a price'),
+          KSpeak(hi
+              ? 'फ़ोटो खींचें, आवाज़ या टाइप करके बताएं, फिर क़ीमत तय करें'
+              : 'Take a photo, describe by voice or typing, then set a price'),
         ],
       ),
       body: Stack(
         children: [
-          ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+          Column(
             children: [
-              _StepCard(
-                step: 1,
-                icon: Icons.camera_alt_rounded,
-                title: T.of(context, lang, 'take_photo'),
-                isLast: false,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+              _WizardProgress(step: _step, labels: labels),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                  children: [_buildStep(context, lang, _step)],
+                ),
+              ),
+              // --- Back / Next / Publish bar ---
+              Container(
+                padding: EdgeInsets.fromLTRB(16, 10, 16, 10 + MediaQuery.paddingOf(context).bottom),
+                decoration: const BoxDecoration(
+                  color: AppColors.surface,
+                  border: Border(top: BorderSide(color: AppColors.line)),
+                ),
+                child: Row(
                   children: [
-                    if (p?.enhancedImageUrl != null)
-                      _BeforeAfter(api: _api, product: p!, lang: lang)
-                    else if (p?.rawImageUrl != null)
-                      KNetImage(_api.mediaUrl(p!.rawImageUrl!), height: 180, radius: Radii.md),
-                    if (p?.enhancedImageUrl != null || p?.rawImageUrl != null) Gap.m,
-                    Row(children: [
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: _busy ? null : () => _takePhotoFrom(ImageSource.camera),
-                          icon: const Icon(Icons.photo_camera_rounded, size: 20),
-                          label: Text(T.of(context, lang, 'take_photo')),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
+                    if (_step > 0) ...[
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: _busy ? null : () => _takePhotoFrom(ImageSource.gallery),
-                          icon: const Icon(Icons.photo_library_rounded, size: 20),
-                          label: Text(T.of(context, lang, 'gallery')),
+                          onPressed: _busy ? null : () => setState(() => _step--),
+                          icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                          label: Text(hi ? 'पीछे' : 'Back'),
                         ),
                       ),
-                    ]),
-                    Gap.xs,
-                    Text(T.of(context, lang, 'photo_hint'),
-                        textAlign: TextAlign.center, style: text.labelSmall),
+                      const SizedBox(width: 12),
+                    ],
+                    Expanded(
+                      flex: _step > 0 ? 1 : 2,
+                      child: FilledButton.icon(
+                        onPressed: (_busy || !canNext)
+                            ? null
+                            : (isLast ? _publish : () => setState(() => _step++)),
+                        icon: Icon(isLast ? Icons.storefront : Icons.arrow_forward_rounded, size: 20),
+                        label: Text(isLast
+                            ? T.of(context, lang, 'publish')
+                            : (hi ? 'आगे' : 'Next')),
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              _StepCard(
-                step: 2,
-                icon: Icons.mic_rounded,
-                title: T.of(context, lang, 'record_voice'),
-                isLast: false,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    FilledButton.icon(
-                      onPressed: _busy ? null : _onVoiceTap,
-                      icon: Icon(_recording ? Icons.stop_rounded : Icons.mic_rounded),
-                      label: Text(_recording
-                          ? (lang == AppLang.hi ? 'रोकें और लिखवाएं' : 'Stop & generate')
-                          : T.of(context, lang, 'record_voice')),
-                      style: _recording
-                          ? FilledButton.styleFrom(backgroundColor: AppColors.danger)
-                          : null,
-                    ),
-                    if (_recording) ...[
-                      Gap.s,
-                      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        const _RecDot(),
-                        const SizedBox(width: 8),
-                        Text(lang == AppLang.hi ? 'सुन रहा है… बोलिए' : 'Listening… speak now',
-                            style: text.labelMedium?.copyWith(color: AppColors.danger)),
-                      ]),
-                    ],
-                    Gap.m,
-                    Row(children: [
-                      const Expanded(child: Divider()),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        child: Text(lang == AppLang.hi ? 'या टाइप करें' : 'or type', style: text.labelSmall),
-                      ),
-                      const Expanded(child: Divider()),
-                    ]),
-                    Gap.m,
-                    TextField(
-                      controller: _textCtrl,
-                      maxLines: 2,
-                      decoration: InputDecoration(
-                        hintText: lang == AppLang.hi
-                            ? 'हाथ से बुनी सूती साड़ी…'
-                            : 'Handwoven cotton saree…',
-                      ),
-                    ),
-                    Gap.s,
-                    OutlinedButton.icon(
-                      onPressed: _busy ? null : _catalogFromText,
-                      icon: const Icon(Icons.edit_note_rounded),
-                      label: Text(T.of(context, lang, 'generate_listing')),
-                    ),
-                    if (p?.titleEn != null) ...[
-                      Gap.m,
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceAlt,
-                          borderRadius: BorderRadius.circular(Radii.md),
-                          border: Border.all(color: AppColors.line),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Primary title in the artisan's selected language.
-                            Text(p!.titleFor(lang == AppLang.hi) ?? '', style: text.titleMedium),
-                            if (((lang == AppLang.hi ? p.titleEn : p.titleHi) ?? '').isNotEmpty) ...[
-                              const SizedBox(height: 2),
-                              Text((lang == AppLang.hi ? p.titleEn : p.titleHi)!, style: text.bodyMedium),
-                            ],
-                            if ((p.descFor(lang == AppLang.hi) ?? '').isNotEmpty) ...[
-                              Gap.s,
-                              // Description in the artisan's selected language.
-                              Text(p.descFor(lang == AppLang.hi) ?? '', style: text.bodyMedium),
-                            ],
-                            if (p.tags.isNotEmpty) ...[
-                              Gap.s,
-                              Wrap(spacing: 6, runSpacing: 6, children: [
-                                for (final t in p.tags) Chip(label: Text('#$t')),
-                              ]),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              _StepCard(
-                step: 3,
-                icon: Icons.currency_rupee_rounded,
-                title: T.of(context, lang, 'suggest_price'),
-                isLast: true,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    FilledButton.icon(
-                      onPressed: _busy || p == null ? null : _suggestPrice,
-                      icon: const Icon(Icons.trending_up),
-                      label: Text(T.of(context, lang, 'suggest_price')),
-                    ),
-                    if (_price != null) ...[
-                      Gap.m,
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 22),
-                        decoration: BoxDecoration(
-                          color: AppColors.success.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(Radii.lg),
-                          border: Border.all(color: AppColors.success.withValues(alpha: 0.25)),
-                        ),
-                        child: Column(
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.local_offer_rounded,
-                                    size: 15, color: AppColors.success),
-                                const SizedBox(width: 6),
-                                Text(lang == AppLang.hi ? 'सुझाई गई क़ीमत' : 'Suggested price',
-                                    style: text.labelSmall
-                                        ?.copyWith(color: AppColors.success)),
-                              ],
-                            ),
-                            Gap.s,
-                            Text(
-                              '${rupees(_price!.min)} – ${rupees(_price!.max)}',
-                              textAlign: TextAlign.center,
-                              style: text.displaySmall?.copyWith(color: AppColors.success),
-                            ),
-                            Gap.s,
-                            Text(_price!.reasoning,
-                                textAlign: TextAlign.center, style: text.bodyMedium),
-                            if (_price!.comparables.isNotEmpty) ...[
-                              Gap.m,
-                              const Divider(),
-                              Gap.s,
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(lang == AppLang.hi ? 'तुलना (बाज़ार)' : 'Comparable listings',
-                                    style: text.labelSmall),
-                              ),
-                              Gap.xs,
-                              for (final c in _price!.comparables)
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 3),
-                                  child: Row(children: [
-                                    const Icon(Icons.circle, size: 5, color: AppColors.muted),
-                                    const SizedBox(width: 8),
-                                    Expanded(child: Text(c.title, style: text.bodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis)),
-                                    Text(rupees(c.price),
-                                        style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textSoft)),
-                                  ]),
-                                ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              Gap.m,
-              FilledButton.icon(
-                // Only publish a complete listing: title + image + price.
-                onPressed: (p != null &&
-                        (p.titleFor(lang == AppLang.hi)?.isNotEmpty ?? false) &&
-                        (p.enhancedImageUrl != null || p.rawImageUrl != null) &&
-                        _price != null &&
-                        !_busy)
-                    ? _publish
-                    : null,
-                icon: const Icon(Icons.storefront),
-                label: Text(T.of(context, lang, 'publish')),
               ),
             ],
           ),
@@ -495,6 +364,373 @@ class _CreateProductScreenState extends ConsumerState<CreateProductScreen> {
       ),
     );
   }
+
+  Widget _buildStep(BuildContext context, AppLang lang, int step) {
+    switch (step) {
+      case 0:
+        return _photoStep(context, lang);
+      case 1:
+        return _detailsStep(context, lang);
+      case 2:
+        return _priceStep(context, lang);
+      default:
+        return _reviewStep(context, lang);
+    }
+  }
+
+  Widget _stepHeader(BuildContext context, IconData icon, String title, String subtitle) {
+    final text = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Container(
+            width: 40, height: 40, alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(Radii.sm),
+            ),
+            child: Icon(icon, color: AppColors.primary, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Text(title, style: text.titleLarge)),
+        ]),
+        const SizedBox(height: 4),
+        Text(subtitle, style: text.bodyMedium?.copyWith(color: AppColors.textSoft)),
+        Gap.m,
+      ],
+    );
+  }
+
+  // --- Step 1: photo + AI enhance ---
+  Widget _photoStep(BuildContext context, AppLang lang) {
+    final hi = lang == AppLang.hi;
+    final text = Theme.of(context).textTheme;
+    final p = _product;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _stepHeader(context, Icons.camera_alt_rounded, T.of(context, lang, 'take_photo'),
+            hi ? 'फ़ोटो खींचें — AI इसे अपने आप स्टूडियो जैसा बना देगा' : 'Add a photo — AI turns it into a studio shot'),
+        if (p?.enhancedImageUrl != null)
+          _BeforeAfter(api: _api, product: p!, lang: lang)
+        else if (p?.rawImageUrl != null)
+          KNetImage(_api.mediaUrl(p!.rawImageUrl!), height: 200, radius: Radii.md),
+        if (p?.enhancedImageUrl != null || p?.rawImageUrl != null) Gap.m,
+        Row(children: [
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: _busy ? null : () => _takePhotoFrom(ImageSource.camera),
+              icon: const Icon(Icons.photo_camera_rounded, size: 20),
+              label: Text(T.of(context, lang, 'take_photo')),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _busy ? null : () => _takePhotoFrom(ImageSource.gallery),
+              icon: const Icon(Icons.photo_library_rounded, size: 20),
+              label: Text(T.of(context, lang, 'gallery')),
+            ),
+          ),
+        ]),
+        Gap.xs,
+        Text(T.of(context, lang, 'photo_hint'),
+            textAlign: TextAlign.center, style: text.labelSmall),
+      ],
+    );
+  }
+
+  // --- Step 2: voice / text -> AI listing ---
+  Widget _detailsStep(BuildContext context, AppLang lang) {
+    final hi = lang == AppLang.hi;
+    final text = Theme.of(context).textTheme;
+    final p = _product;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _stepHeader(context, Icons.mic_rounded, T.of(context, lang, 'record_voice'),
+            hi ? 'बोलकर या टाइप करके बताएं — AI लिस्टिंग लिख देगा' : 'Speak or type — AI writes the listing'),
+        FilledButton.icon(
+          onPressed: _busy ? null : _onVoiceTap,
+          icon: Icon(_recording ? Icons.stop_rounded : Icons.mic_rounded),
+          label: Text(_recording
+              ? (hi ? 'रोकें और लिखवाएं' : 'Stop & generate')
+              : T.of(context, lang, 'record_voice')),
+          style: _recording ? FilledButton.styleFrom(backgroundColor: AppColors.danger) : null,
+        ),
+        if (_recording) ...[
+          Gap.s,
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            const _RecDot(),
+            const SizedBox(width: 8),
+            Text(hi ? 'सुन रहा है… बोलिए' : 'Listening… speak now',
+                style: text.labelMedium?.copyWith(color: AppColors.danger)),
+          ]),
+        ],
+        Gap.m,
+        Row(children: [
+          const Expanded(child: Divider()),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text(hi ? 'या टाइप करें' : 'or type', style: text.labelSmall),
+          ),
+          const Expanded(child: Divider()),
+        ]),
+        Gap.m,
+        TextField(
+          controller: _textCtrl,
+          maxLines: 2,
+          decoration: InputDecoration(
+            hintText: hi ? 'हाथ से बुनी सूती साड़ी…' : 'Handwoven cotton saree…',
+          ),
+        ),
+        Gap.s,
+        OutlinedButton.icon(
+          onPressed: _busy ? null : _catalogFromText,
+          icon: const Icon(Icons.edit_note_rounded),
+          label: Text(T.of(context, lang, 'generate_listing')),
+        ),
+        if (p?.titleEn != null || p?.titleHi != null) ...[
+          Gap.m,
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceAlt,
+              borderRadius: BorderRadius.circular(Radii.md),
+              border: Border.all(color: AppColors.line),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Primary title in the artisan's selected language.
+                Text(p!.titleFor(hi) ?? '', style: text.titleMedium),
+                if (((hi ? p.titleEn : p.titleHi) ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text((hi ? p.titleEn : p.titleHi)!, style: text.bodyMedium),
+                ],
+                if ((p.descFor(hi) ?? '').isNotEmpty) ...[
+                  Gap.s,
+                  Text(p.descFor(hi) ?? '', style: text.bodyMedium),
+                ],
+                if (p.tags.isNotEmpty) ...[
+                  Gap.s,
+                  Wrap(spacing: 6, runSpacing: 6, children: [
+                    for (final t in p.tags) Chip(label: Text('#$t')),
+                  ]),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // --- Step 3: price (AI suggestion + editable final price) ---
+  Widget _priceStep(BuildContext context, AppLang lang) {
+    final hi = lang == AppLang.hi;
+    final text = Theme.of(context).textTheme;
+    final p = _product;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _stepHeader(context, Icons.currency_rupee_rounded, hi ? 'क़ीमत तय करें' : 'Set your price',
+            hi ? 'अपनी क़ीमत लिखें, या AI से सुझाव लेकर बदलें' : 'Enter your price, or get an AI suggestion and adjust'),
+        // The editable final price — the artisan is always in control.
+        TextField(
+          controller: _priceCtrl,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(
+            labelText: hi ? 'आपकी क़ीमत' : 'Your price',
+            prefixText: '₹  ',
+            prefixStyle: const TextStyle(
+                fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.text),
+            helperText: hi ? 'यही क़ीमत खरीदारों को दिखेगी' : 'This is the price buyers will see',
+          ),
+        ),
+        Gap.m,
+        OutlinedButton.icon(
+          onPressed: _busy || p == null ? null : _suggestPrice,
+          icon: const Icon(Icons.auto_awesome_rounded),
+          label: Text(hi ? 'AI से क़ीमत सुझाएं' : 'Suggest price with AI'),
+        ),
+        if (_price != null) ...[
+          Gap.m,
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(Radii.lg),
+              border: Border.all(color: AppColors.success.withValues(alpha: 0.25)),
+            ),
+            child: Column(
+              children: [
+                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  const Icon(Icons.local_offer_rounded, size: 15, color: AppColors.success),
+                  const SizedBox(width: 6),
+                  Text(hi ? 'AI सुझाव' : 'AI suggestion',
+                      style: text.labelSmall?.copyWith(color: AppColors.success)),
+                ]),
+                Gap.s,
+                Text('${rupees(_price!.min)} – ${rupees(_price!.max)}',
+                    textAlign: TextAlign.center,
+                    style: text.headlineSmall?.copyWith(color: AppColors.success)),
+                Gap.xs,
+                // Quick-apply chips for the low/high ends of the AI range.
+                Wrap(spacing: 8, alignment: WrapAlignment.center, children: [
+                  ActionChip(
+                    label: Text('${hi ? 'कम' : 'Low'} ${rupees(_price!.min)}'),
+                    onPressed: () => setState(() => _priceCtrl.text = _price!.min.round().toString()),
+                  ),
+                  ActionChip(
+                    label: Text('${hi ? 'ज़्यादा' : 'High'} ${rupees(_price!.max)}'),
+                    onPressed: () => setState(() => _priceCtrl.text = _price!.max.round().toString()),
+                  ),
+                ]),
+                Gap.s,
+                Text(_price!.reasoning, textAlign: TextAlign.center, style: text.bodyMedium),
+                if (_price!.comparables.isNotEmpty) ...[
+                  Gap.m,
+                  const Divider(),
+                  Gap.s,
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(hi ? 'तुलना (बाज़ार)' : 'Comparable listings', style: text.labelSmall),
+                  ),
+                  Gap.xs,
+                  for (final c in _price!.comparables)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Row(children: [
+                        const Icon(Icons.circle, size: 5, color: AppColors.muted),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(c.title, style: text.bodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                        Text(rupees(c.price),
+                            style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textSoft)),
+                      ]),
+                    ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // --- Step 4: review everything before going live ---
+  Widget _reviewStep(BuildContext context, AppLang lang) {
+    final hi = lang == AppLang.hi;
+    final text = Theme.of(context).textTheme;
+    final p = _product;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _stepHeader(context, Icons.fact_check_rounded, hi ? 'समीक्षा करें' : 'Review',
+            hi ? 'सब ठीक है? फिर नीचे लिस्ट करें' : 'Looks good? Publish below'),
+        if (p?.enhancedImageUrl != null || p?.rawImageUrl != null)
+          KNetImage(_api.mediaUrl(p!.enhancedImageUrl ?? p.rawImageUrl!),
+              height: 200, radius: Radii.md),
+        Gap.m,
+        Text(p?.titleFor(hi) ?? '', style: text.titleLarge),
+        if ((p?.descFor(hi) ?? '').isNotEmpty) ...[
+          Gap.s,
+          Text(p!.descFor(hi) ?? '', style: text.bodyMedium),
+        ],
+        Gap.m,
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceAlt,
+            borderRadius: BorderRadius.circular(Radii.md),
+            border: Border.all(color: AppColors.line),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(hi ? 'क़ीमत' : 'Price', style: text.titleMedium),
+              Text(rupees(_priceValue ?? 0),
+                  style: text.titleLarge?.copyWith(color: AppColors.primary, fontWeight: FontWeight.w800)),
+            ],
+          ),
+        ),
+        Gap.s,
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          const Icon(Icons.verified_rounded, size: 14, color: AppColors.success),
+          const SizedBox(width: 6),
+          Text(T.of(context, lang, 'ondc_ready'),
+              style: text.labelSmall?.copyWith(color: AppColors.success)),
+        ]),
+      ],
+    );
+  }
+}
+
+/// Top-of-wizard progress: a labelled dot per step with a connecting bar that
+/// fills as the artisan advances.
+class _WizardProgress extends StatelessWidget {
+  const _WizardProgress({required this.step, required this.labels});
+  final int step;
+  final List<String> labels;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(bottom: BorderSide(color: AppColors.line)),
+      ),
+      child: Row(
+        children: [
+          for (var i = 0; i < labels.length; i++) ...[
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 30, height: 30, alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: i < step
+                        ? AppColors.primary
+                        : (i == step ? AppColors.primary : AppColors.surfaceAlt),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                        color: i <= step ? AppColors.primary : AppColors.line, width: 1.5),
+                  ),
+                  child: i < step
+                      ? const Icon(Icons.check_rounded, size: 17, color: Colors.white)
+                      : Text('${i + 1}',
+                          style: TextStyle(
+                              color: i == step ? Colors.white : AppColors.muted,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13)),
+                ),
+                const SizedBox(height: 4),
+                Text(labels[i],
+                    style: text.labelSmall?.copyWith(
+                        color: i <= step ? AppColors.text : AppColors.muted,
+                        fontWeight: i == step ? FontWeight.w700 : FontWeight.w500)),
+              ],
+            ),
+            if (i < labels.length - 1)
+              Expanded(
+                child: Container(
+                  height: 2,
+                  margin: const EdgeInsets.only(bottom: 18),
+                  color: i < step ? AppColors.primary : AppColors.line,
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 /// A small pulsing red dot shown while the mic is actively recording.
@@ -523,83 +759,6 @@ class _RecDotState extends State<_RecDot> with SingleTickerProviderStateMixin {
         width: 12,
         height: 12,
         decoration: const BoxDecoration(color: AppColors.danger, shape: BoxShape.circle),
-      ),
-    );
-  }
-}
-
-/// A single step in the vertical stepper: numbered square badge + connector
-/// line on the left, titled KCard on the right.
-class _StepCard extends StatelessWidget {
-  const _StepCard({
-    required this.step,
-    required this.icon,
-    required this.title,
-    required this.child,
-    required this.isLast,
-  });
-  final int step;
-  final IconData icon;
-  final String title;
-  final Widget child;
-  final bool isLast;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Column(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(Radii.sm),
-                ),
-                child: Text('$step',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800)),
-              ),
-              if (!isLast)
-                Expanded(
-                  child: Container(
-                    width: 2,
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    color: AppColors.line,
-                  ),
-                ),
-            ],
-          ),
-          Gap.m,
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(bottom: isLast ? 0 : 20),
-              child: KCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(icon, size: 20, color: AppColors.primary),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text(title, style: text.titleLarge)),
-                      ],
-                    ),
-                    Gap.m,
-                    child,
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
