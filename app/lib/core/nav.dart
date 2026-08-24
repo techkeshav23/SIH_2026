@@ -115,6 +115,11 @@ class AppDrawer extends ConsumerWidget {
               ),
             const Divider(height: 24, indent: 16, endIndent: 16),
             _DrawerItem(
+              icon: Icons.auto_awesome_rounded,
+              label: hi ? 'कला — आवाज़ सहायक' : 'Kala — voice assistant',
+              onTap: () { Navigator.pop(context); context.push('/kala'); },
+            ),
+            _DrawerItem(
               icon: Icons.dashboard_rounded,
               label: hi ? 'डैशबोर्ड' : 'Dashboard',
               onTap: () { Navigator.pop(context); context.push('/dashboard'); },

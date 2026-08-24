@@ -21,6 +21,7 @@ import '../features/product/product_detail_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/studio/create_product_screen.dart';
+import '../features/voice/kala_screen.dart';
 
 /// Artisan-only sections. A signed-in buyer hitting these is bounced home.
 const _artisanOnly = {'/home', '/products', '/create', '/market', '/orders', '/dashboard'};
@@ -78,6 +79,7 @@ GoRouter buildRouter(Api api) {
         path: '/storefront/:id',
         builder: (c, s) => StorefrontScreen(artisanId: s.pathParameters['id']!),
       ),
+      GoRoute(path: '/kala', builder: (c, s) => const KalaScreen()),
       GoRoute(path: '/notifications', builder: (c, s) => const NotificationsScreen()),
       GoRoute(path: '/quotes', builder: (c, s) => const QuotesScreen()),
       GoRoute(path: '/buyer/home', builder: (c, s) => const BuyerHomeScreen()),

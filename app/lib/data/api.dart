@@ -549,4 +549,9 @@ class Api {
 
   String mediaUrl(String path) =>
       (path.startsWith('http') || path.startsWith('asset:')) ? path : '$kBaseUrl$path';
+
+  /// WebSocket URL for the Kala voice agent (http->ws, https->wss), with the
+  /// artisan's access token so the backend can scope tools to them.
+  String get voiceWsUrl =>
+      '${kBaseUrl.replaceFirst('http', 'ws')}/voice/live?token=${_token ?? ''}';
 }
