@@ -106,7 +106,8 @@ def _gemini_audio(audio_bytes: bytes, mime_type: str, source_lang: str) -> Catal
         f"(spoken language hint: '{source_lang}'). Transcribe it faithfully, "
         f"then create the listing per the schema."
     )
-    resp = _client().models.generate_content(
+    client = _client()  # hold a strong ref for the whole call (see build_client)
+    resp = client.models.generate_content(
         model=settings.gemini_model,
         contents=[prompt, types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)],
         config=types.GenerateContentConfig(
@@ -129,7 +130,8 @@ def _gemini_text(description_en: str, category: str, material: str) -> CatalogRe
         f"Known material (may be blank): {material}\n"
         f"Create the listing per the schema."
     )
-    resp = _client().models.generate_content(
+    client = _client()  # hold a strong ref for the whole call (see build_client)
+    resp = client.models.generate_content(
         model=settings.gemini_model,
         contents=prompt,
         config=types.GenerateContentConfig(

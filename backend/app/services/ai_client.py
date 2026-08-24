@@ -39,7 +39,8 @@ def warmup() -> bool:
         return False
     for attempt in range(3):
         try:
-            build_client().models.generate_content(model=settings.gemini_model, contents="hi")
+            client = build_client()  # hold a strong ref (see build_client note)
+            client.models.generate_content(model=settings.gemini_model, contents="hi")
             log.info("genai warmup ok (attempt %d)", attempt + 1)
             return True
         except Exception as e:  # noqa: BLE001
@@ -50,14 +51,20 @@ def warmup() -> bool:
 
 
 def build_client():
-    """Construct a genai.Client for Vertex AI (or the Developer API fallback)."""
+    """Construct a genai.Client for Vertex AI (or the Developer API fallback).
+
+    IMPORTANT: the caller MUST hold this client in a local variable for the whole
+    request. google-genai's httpx client closes itself in __del__, so if the client
+    is a throwaway expression (e.g. build_client().models.generate_content(...)) it
+    can be garbage-collected mid-call — the transport then closes and the request
+    fails with 'client has been closed'. This bit only on prod (Cloud Run GC is more
+    eager than a local dev box), which is why listings silently fell back to stubs.
+    """
     from google import genai
     from google.genai import types
 
-    # Disable google-genai's INTERNAL retry: on a retryable error it closes the
-    # httpx client and then re-raises 'client has been closed', masking the real
-    # error and breaking worker-thread calls. We keep our own _with_retry (fresh
-    # client each attempt) instead, and the true error now surfaces in the logs.
+    # Also disable google-genai's INTERNAL retry (it closes the client on a retryable
+    # error and masks the real one); our own _with_retry handles retries.
     http = types.HttpOptions(timeout=TIMEOUT_MS, retry_options=types.HttpRetryOptions(attempts=1))
     if settings.use_vertex:
         # Auth via Application Default Credentials:
