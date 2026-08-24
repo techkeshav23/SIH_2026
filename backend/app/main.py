@@ -82,6 +82,12 @@ def _warm_rembg():
 @app.on_event("startup")
 def _startup():
     init_db()
+    # Prime google-genai in THIS (main) thread — see ai_client.warmup(). Without it
+    # the first Gemini call from a worker thread fails and listings fall back to the
+    # stub. Runs once at startup; best-effort.
+    from app.services import ai_client
+
+    ai_client.warmup()
     # Warm the background-removal model in a background thread so container
     # startup/readiness isn't blocked but the first enhance is already fast.
     if settings.use_rembg:

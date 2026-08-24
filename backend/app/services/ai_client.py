@@ -22,6 +22,33 @@ def ai_enabled() -> bool:
     return bool(settings.gemini_api_key)
 
 
+def warmup() -> bool:
+    """Prime google-genai in the MAIN thread at startup.
+
+    google-genai 2.x lazily initializes a shared HTTP transport on first use. If
+    that first use lands in a worker thread (FastAPI runs sync endpoints and eager
+    Celery tasks in a threadpool), every call fails with 'client has been closed'
+    and the listing silently degrades to the stub. Making one call from the main
+    thread here initializes the transport correctly so the threadpool calls work.
+    """
+    import logging
+    import time
+
+    log = logging.getLogger("kalasetu.ai")
+    if not ai_enabled():
+        return False
+    for attempt in range(3):
+        try:
+            build_client().models.generate_content(model=settings.gemini_model, contents="hi")
+            log.info("genai warmup ok (attempt %d)", attempt + 1)
+            return True
+        except Exception as e:  # noqa: BLE001
+            log.warning("genai warmup attempt %d failed: %s", attempt + 1, str(e)[:80])
+            time.sleep(2 * (attempt + 1))
+    log.error("genai warmup failed — listings may fall back to stub")
+    return False
+
+
 def build_client():
     """Construct a genai.Client for Vertex AI (or the Developer API fallback)."""
     from google import genai
