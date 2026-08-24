@@ -101,15 +101,18 @@ class _BuyerDrawer extends ConsumerWidget {
             title: Text(hi ? 'लॉग आउट' : 'Logout',
                 style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w600)),
             onTap: () async {
-              Navigator.pop(context);
+              // Capture the router BEFORE the drawer closes — popping first
+              // deactivates this drawer's context, so a later context.mounted
+              // check would be false and silently skip the logout.
+              final router = GoRouter.of(context);
               final ok = await confirmDialog(context,
                   title: hi ? 'लॉग आउट करें?' : 'Logout?',
                   message: hi ? 'KalaSetu से साइन आउट करें?' : 'Sign out of KalaSetu?',
                   confirm: hi ? 'लॉग आउट' : 'Logout', danger: true);
-              if (!ok || !context.mounted) return;
+              if (!ok) return;
               await api.logout();
               ref.invalidate(cartProvider); // don't leak the cart into the next account
-              if (context.mounted) context.go('/login');
+              router.go('/login'); // replaces the whole stack (closes the drawer too)
             },
           ),
           Padding(
