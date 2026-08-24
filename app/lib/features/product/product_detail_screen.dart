@@ -334,7 +334,9 @@ class _BoostCard extends StatelessWidget {
   final bool busy;
   final ValueChanged<double> onBoost;
 
-  static const _quickAmounts = [250.0, 500.0, 1000.0];
+  // Matches the backend's BudgetIncrease minimum (₹100) and the platform's
+  // per-day floor, so every option here actually takes effect on Meta.
+  static const _quickAmounts = [100.0, 250.0, 500.0];
 
   @override
   Widget build(BuildContext context) {
@@ -387,7 +389,10 @@ class _BoostCard extends StatelessWidget {
           ],
           if (!c.isStub) ...[
             Gap.xs,
-            Text(hi ? 'कम से कम ₹250 — असली विज्ञापन खाते में लागू होगा' : 'Min ₹250 — applied to your real ad account',
+            Text(
+                hi
+                    ? 'असली विज्ञापन खाते के ad set पर लागू होगा — अभियान रुका हुआ रहेगा'
+                    : "Applied to the ad set in your real ad account — the campaign stays paused",
                 style: text.labelSmall),
           ],
         ],

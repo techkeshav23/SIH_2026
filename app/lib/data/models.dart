@@ -342,28 +342,38 @@ class AppNotification {
       );
 }
 
-/// Response from POST /promote/boost (docs/PROMOTE_ADS_API.md).
+/// Response from POST /promote/boost (docs/PROMOTE_ADS_API.md). The ad is always
+/// created PAUSED on the platform, so `status` is 'paused' on success.
 class BoostResult {
-  final String status; // under_review | active | rejected | failed
-  final String? adId;
+  final String status; // paused | failed
   final String? campaignId;
+  final String? adId;
+  final double dailyBudget;
   final List<int> estimatedReach;
   final String? permalink;
+  /// Why the image/creative layer was skipped, when it was — surfaced so the
+  /// artisan isn't left wondering where their photo went.
+  final String? note;
 
   BoostResult({
     required this.status,
-    this.adId,
     this.campaignId,
+    this.adId,
+    this.dailyBudget = 0,
     this.estimatedReach = const [],
     this.permalink,
+    this.note,
   });
 
   factory BoostResult.fromJson(Map<String, dynamic> j) => BoostResult(
-        status: j['status'] ?? 'under_review',
-        adId: j['ad_id'],
+        status: j['status'] ?? 'paused',
         campaignId: j['campaign_id'],
-        estimatedReach: (j['estimated_reach'] as List?)?.map((e) => (e as num).toInt()).toList() ?? const [],
+        adId: j['ad_id'],
+        dailyBudget: (j['daily_budget'] as num?)?.toDouble() ?? 0,
+        estimatedReach:
+            (j['estimated_reach'] as List?)?.map((e) => (e as num).toInt()).toList() ?? const [],
         permalink: j['permalink'],
+        note: j['note'],
       );
 }
 
@@ -406,11 +416,29 @@ class Campaign {
       );
 
   bool get onMeta => platforms.contains('meta');
-  bool get onGoogle => platforms.contains('google');
 
-  /// True if every requested platform actually returned a stub id (no real
-  /// credentials configured yet) — used to show a friendly "demo mode" hint.
-  bool get isStub => platformIds.values.any((v) => v.toString().startsWith('stub_'));
+  /// Meta's campaign id (the real integration), or null.
+  String? get metaCampaignId => platformIds['meta']?.toString();
+
+  /// The ad set is what actually carries the budget — see
+  /// backend app/services/meta_ads.py.
+  String? get metaAdSetId => platformIds['meta_adset']?.toString();
+
+  /// True when this campaign only exists locally — Meta wasn't configured, so
+  /// we stored placeholder ids. Judged on Meta alone (the one implemented
+  /// platform); an unimplemented platform must not make a real campaign look
+  /// like a demo.
+  bool get isStub {
+    final id = metaCampaignId;
+    return id == null || id.startsWith('stub_');
+  }
+
+  /// Direct link to this campaign in Ads Manager, when it's real.
+  String? get metaUrl => platformUrls['meta']?.toString();
+
+  /// Platform names to show the artisan. Only Meta is wired up today, so we
+  /// don't advertise anything else as if it were running.
+  String get platformLabel => onMeta ? 'Meta (Facebook + Instagram)' : '—';
 }
 
 class ArtisanStats {

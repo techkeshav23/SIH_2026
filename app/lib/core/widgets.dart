@@ -19,6 +19,10 @@ const Map<String, List<String>> _statusLabels = {
   'shipped': ['Shipped', 'भेजा गया'],
   'completed': ['Completed', 'पूर्ण'],
   'cancelled': ['Cancelled', 'रद्द'],
+  // ad campaigns — created PAUSED on the ad platform so they never spend
+  // unattended; 'failed' means no platform accepted it.
+  'paused': ['Paused', 'रुका हुआ'],
+  'failed': ['Failed', 'नहीं बना'],
 };
 
 /// Confirmation dialog for irreversible actions. Returns true if confirmed.
@@ -66,8 +70,11 @@ Color statusColor(String status) {
       return AppColors.primary;
     case 'shipped':
       return AppColors.indigo;
+    case 'paused':
+      return AppColors.accent;
     case 'rejected':
     case 'cancelled':
+    case 'failed':
       return AppColors.danger;
     default:
       return AppColors.muted;

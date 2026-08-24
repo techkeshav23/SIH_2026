@@ -201,24 +201,14 @@ class _CampaignRow extends StatelessWidget {
                 maxLines: 1, overflow: TextOverflow.ellipsis, style: text.titleSmall),
             const SizedBox(height: 1),
             Text(
-              '${campaign.platforms.map((p) => p == 'meta' ? 'Meta' : 'Google Ads').join(' + ')}'
-              ' · ${rupees(campaign.dailyBudget)}/${hi ? 'दिन' : 'day'}'
+              '${rupees(campaign.dailyBudget)}/${hi ? 'दिन' : 'day'}'
               '${campaign.isStub ? (hi ? ' · डेमो' : ' · demo') : ''}',
               style: text.labelSmall,
             ),
           ]),
         ),
-        // Created PAUSED on purpose — never spends until the artisan resumes it.
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-          decoration: BoxDecoration(
-            color: AppColors.accent.withValues(alpha: 0.16),
-            borderRadius: BorderRadius.circular(Radii.pill),
-          ),
-          child: Text(hi ? 'रुका हुआ' : 'Paused',
-              style: const TextStyle(
-                  color: AppColors.primaryDark, fontSize: 11, fontWeight: FontWeight.w700)),
-        ),
+        // Same status vocabulary as the Campaigns screen — one source of truth.
+        KStatusPill(campaign.status),
       ]),
     );
   }

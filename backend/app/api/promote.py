@@ -1,22 +1,20 @@
 """Promote — marketing helpers for the app's Promote/Poster feature.
 
-An AI marketing caption for a product (Gemini-written, falls back to a
-template), and the paid Boost/ads endpoint (Meta Marketing API) per the
-contract in docs/PROMOTE_ADS_API.md. Boost creates a real, PAUSED campaign
-in the artisan's own Meta ad account — never spends, never goes live — using
-app.services.meta_ads (off/misconfigured -> a functional stub, same
-demo-safety pattern as app.services.meta_ads.create_campaign)."""
-import os
+Two things live here: an AI marketing caption for a product (Gemini-written,
+falls back to a template), and Boost — promote one product as a real ad.
 
+Boost creates a PAUSED campaign in the artisan's own Meta ad account (never
+spends, never goes live until they resume it) via app.services.campaign_service,
+the same path POST /campaigns uses — so a boost and a custom campaign are
+identical in the database and in Ads Manager. See docs/PROMOTE_ADS_API.md."""
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.core.config import settings
 from app.core.db import get_db
-from app.models import Campaign, Product, User
-from app.services import language_ai
+from app.models import Product, User
+from app.services import campaign_service, language_ai, meta_ads
 
 router = APIRouter(prefix="/promote", tags=["promote"])
 
@@ -48,6 +46,8 @@ def caption(
 
 class BoostIn(BaseModel):
     product_id: str
+    # Total spend the artisan wants, spread over `days`. The per-day rate sent
+    # to Meta is total/days, floored at the platform minimum.
     budget_rupees: float = Field(gt=0)
     days: int = Field(gt=0, le=30)
     audience: str = "nearby"        # "nearby" | "india"
@@ -55,32 +55,15 @@ class BoostIn(BaseModel):
 
 
 class BoostOut(BaseModel):
-    status: str                          # under_review | active | rejected | failed
-    ad_id: str | None = None
-    campaign_id: str | None = None
+    # "paused" is the honest state: everything is created PAUSED on Meta and
+    # only spends once the artisan resumes it. "failed" if no platform accepted.
+    status: str                          # paused | failed
+    campaign_id: str | None = None       # our Campaign id
+    ad_id: str | None = None             # Meta ad id, when a creative was built
+    daily_budget: float = 0              # per-day rate actually sent to Meta
     estimated_reach: list[int] = []
     permalink: str | None = None
-
-
-def _read_product_image(product: Product) -> bytes | None:
-    """Read the product's studio (enhanced) image bytes directly from storage
-    — mirrors app.api.campaigns._read_product_image. Returns None if there's
-    no image or it can't be read (the boost still proceeds without an image)."""
-    path = product.enhanced_image_url or product.raw_image_url
-    if not path:
-        return None
-    filename = path.rsplit("/", 1)[-1]
-    try:
-        if settings.gcs_bucket:
-            from app.core import gcs
-
-            return gcs.get_image(filename)
-        from app.services.image_ai import UPLOAD_DIR
-
-        with open(os.path.join(UPLOAD_DIR, filename), "rb") as f:
-            return f.read()
-    except Exception:  # noqa: BLE001
-        return None
+    note: str | None = None              # why the image/creative was skipped, etc.
 
 
 @router.post("/boost", response_model=BoostOut)
@@ -89,58 +72,45 @@ def boost(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Create a real (PAUSED) ad campaign for one product — see
-    docs/PROMOTE_ADS_API.md for the full contract."""
+    """Promote one product as a real (PAUSED) ad — see docs/PROMOTE_ADS_API.md."""
     p = db.get(Product, body.product_id)
     if not p or p.user_id != user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found")
 
-    from app.services import meta_ads
+    # Spread the total over the run, but never below Meta's per-day floor —
+    # otherwise the platform rejects the ad set outright.
+    daily = max(body.budget_rupees / body.days, meta_ads.MIN_DAILY_BUDGET_INR)
 
-    # image_source == "poster"/"gallery" isn't uploaded from the client yet in
-    # this pass (the Flutter Boost screen renders the poster on-device and
-    # doesn't send it up) — fall back to the studio photo either way so the
-    # ad still gets a real image whenever one exists.
-    image_bytes = _read_product_image(p) if body.image_source in ("studio", "poster", "gallery") else None
-
-    hi_title = p.title_hi or p.title_en or "Handmade product"
+    title = p.title_hi or p.title_en or "Handmade product"
     caption = language_ai.marketing_caption(
-        hi_title, p.desc_hi or p.desc_en or "", float(p.final_price or p.suggested_price_max or 0), "hi"
+        title,
+        p.desc_hi or p.desc_en or "",
+        float(p.final_price or p.suggested_price_max or 0),
+        "hi",
     )
 
-    name = f"KalaSetu — {hi_title}"[:190]
-    result = meta_ads.boost_product(
-        name=name,
-        budget_rupees=body.budget_rupees,
+    # image_source "poster"/"gallery" aren't uploaded from the client yet (the
+    # poster is rendered on-device), so the studio photo backs all three for now.
+    c = campaign_service.create(
+        db,
+        user,
+        name=f"KalaSetu — {title}"[:190],
+        daily_budget_inr=daily,
+        product=p,
         days=body.days,
-        audience=body.audience,
-        caption=caption,
-        image_bytes=image_bytes,
-    )
-    if result.get("status") == "failed":
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, result.get("error", "Meta API error"))
-
-    # Persist it as a Campaign so a boost created here is visible everywhere the
-    # artisan looks (GET /campaigns, the Marketing screen, the product page's
-    # budget-boost card) — same source of truth as POST /campaigns.
-    campaign_id = str(result.get("campaign_id") or "")
-    platform_ids: dict = {"meta": campaign_id} if campaign_id else {}
-    if result.get("ad_id"):
-        platform_ids["meta_ad"] = str(result["ad_id"])
-    c = Campaign(
-        user_id=user.id,
-        product_id=p.id,
-        name=name,
-        objective="OUTCOME_TRAFFIC",
-        # The ad set spends per day; store the per-day rate so the boost card's
-        # "current daily budget" matches what Meta actually has.
-        daily_budget=round(body.budget_rupees / max(body.days, 1), 2),
         platforms=["meta"],
-        status="created",
-        platform_ids=platform_ids,
-        platform_urls={"meta": result["permalink"]} if result.get("permalink") else {},
+        caption=caption,
     )
-    db.add(c)
-    db.commit()
 
-    return BoostOut(**{k: v for k, v in result.items() if k in BoostOut.model_fields})
+    if c.status == campaign_service.STATUS_FAILED:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, c.error or "Ad platform error")
+
+    return BoostOut(
+        status=c.status,
+        campaign_id=c.id,
+        ad_id=c.platform_ids.get("meta_ad"),
+        daily_budget=c.daily_budget,
+        estimated_reach=meta_ads.estimated_reach(daily, body.days),
+        permalink=c.platform_urls.get("meta"),
+        note=c.error,
+    )

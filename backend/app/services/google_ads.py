@@ -1,19 +1,26 @@
-"""Google Ads API adapter — placeholder for creating a real PAUSED campaign in
-the artisan's own Google Ads account.
+"""Google Ads adapter — NOT IMPLEMENTED YET.
 
-Google Ads campaign creation needs 4 linked resources (CampaignBudget ->
-Campaign -> AdGroup -> AdGroupAd) plus OAuth + a developer token, which is a
-heavier setup than Meta. USE_GOOGLE_ADS is off by default, so this always
-returns a functional stub today — wire `_create_real` up to the
-google-ads-python client once credentials are available, following the exact
-same enabled()/create_campaign()/stub shape as app.services.meta_ads.
+Creating a Google Ads campaign needs four linked resources (CampaignBudget ->
+Campaign -> AdGroup -> AdGroupAd) plus OAuth and a developer token that must be
+approved for production customer ids. That's a much heavier setup than Meta, so
+it isn't wired up.
+
+Deliberate choice: rather than returning a fake "success" (which made real
+Meta-only campaigns look like demos in the UI), `create_campaign` reports
+`available: False` with a reason. The API layer surfaces that as a per-platform
+error and does not record a fake platform id.
+
+To implement: mirror app.services.meta_ads — one `create_paused_campaign`-style
+entry point that builds everything PAUSED, and an `update_budget` that targets
+the CampaignBudget resource.
 """
 import logging
-import uuid
 
 from app.core.config import settings
 
 log = logging.getLogger("kalasetu.google_ads")
+
+_UNAVAILABLE = "Google Ads isn't connected yet — campaigns run on Meta for now"
 
 
 def enabled() -> bool:
@@ -25,38 +32,10 @@ def enabled() -> bool:
     )
 
 
-def create_campaign(
-    name: str,
-    objective: str = "OUTCOME_TRAFFIC",
-    daily_budget_inr: float = 200.0,
-    image_bytes: bytes | None = None,
-) -> dict:
-    if not enabled():
-        return _stub_campaign(name)
-    try:
-        return _create_real(name, objective, daily_budget_inr, image_bytes)
-    except Exception as e:  # noqa: BLE001
-        log.warning("Google Ads campaign create failed for %r: %s", name, e)
-        return _stub_campaign(name, error=str(e)[:200])
+def create_campaign(*_args, **_kwargs) -> dict:
+    log.info("Google Ads campaign requested but the integration is not implemented")
+    return {"available": False, "error": _UNAVAILABLE}
 
 
-def update_budget(campaign_id: str, daily_budget_inr: float) -> dict:
-    if not enabled() or campaign_id.startswith("stub_"):
-        return {"ok": False, "error": "google ads not enabled or stub campaign"}
-    return {"ok": False, "error": "not implemented"}
-
-
-def _create_real(
-    name: str, objective: str, daily_budget_inr: float, image_bytes: bytes | None
-) -> dict:
-    # TODO(prod): use google-ads-python (CampaignBudgetService, CampaignService,
-    # AdGroupService, AdGroupAdService), all mutate operations with the created
-    # Campaign's status set to PAUSED. Requires an approved developer token for
-    # production customer ids (test accounts work immediately).
-    raise NotImplementedError("Wire google-ads-python campaign creation here")
-
-
-def _stub_campaign(name: str, error: str | None = None) -> dict:
-    fake_id = f"stub_{uuid.uuid4().hex[:12]}"
-    log.info("Google Ads campaign stub used for %r (real API disabled/unavailable)", name)
-    return {"id": fake_id, "url": None, "stub": True, "error": error}
+def update_budget(*_args, **_kwargs) -> dict:
+    return {"ok": False, "error": _UNAVAILABLE}

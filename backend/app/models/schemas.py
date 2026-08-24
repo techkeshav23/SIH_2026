@@ -320,12 +320,17 @@ class CampaignCreate(BaseModel):
     name: str
     product_id: str | None = None
     objective: str = "OUTCOME_TRAFFIC"     # OUTCOME_TRAFFIC | OUTCOME_ENGAGEMENT | OUTCOME_SALES
-    daily_budget: float = 200.0            # INR — informational only, campaign is created PAUSED
-    platforms: list[str] = ["meta"]        # "meta" | "google" | both
+    # Real per-day budget on the ad set. The campaign is created PAUSED, so
+    # nothing is spent until the artisan resumes it — but this is the rate that
+    # would apply. Validated against meta_ads.MIN_DAILY_BUDGET_INR in the router.
+    daily_budget: float = Field(default=200.0, gt=0)
+    platforms: list[str] = ["meta"]        # only "meta" is implemented today
 
 
 class BudgetIncrease(BaseModel):
-    amount: float = Field(ge=250.0)  # ₹250 minimum bump, enforced server-side too
+    # Smallest meaningful bump. Kept at/above the ad platform's per-day floor
+    # (see meta_ads.MIN_DAILY_BUDGET_INR) so an increase always takes effect.
+    amount: float = Field(ge=100.0)
 
 
 class CampaignOut(BaseModel):

@@ -319,14 +319,16 @@ class Demo {
 
   // ---- promote / boost (demo) ----
   static Map<String, dynamic> boostProduct(double budgetRupees, int days) {
-    final low = (budgetRupees * days * 1.4).round();
-    final high = (budgetRupees * days * 3.2).round();
+    final low = (budgetRupees * 1.4).round();
+    final high = (budgetRupees * 3.2).round();
     return {
-      'status': 'under_review',
-      'ad_id': 'demo_ad_${_seq++}',
+      'status': 'paused',
       'campaign_id': 'demo_campaign_${_seq++}',
+      'ad_id': 'demo_ad_${_seq++}',
+      'daily_budget': budgetRupees / (days == 0 ? 1 : days),
       'estimated_reach': [low, high],
       'permalink': null,
+      'note': null,
     };
   }
 
@@ -347,7 +349,7 @@ class Demo {
     final c = {
       'id': 'c${_seq++}', 'name': name, 'product_id': productId,
       'objective': 'OUTCOME_TRAFFIC', 'daily_budget': 200.0,
-      'platforms': platforms, 'status': 'created',
+      'platforms': platforms, 'status': 'paused',
       'platform_ids': ids, 'platform_urls': <String, dynamic>{}, 'error': null,
     };
     campaigns.insert(0, c);

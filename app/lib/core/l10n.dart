@@ -254,6 +254,10 @@ class T {
     'no_campaigns_sub': {AppLang.hi: 'नीचे बटन दबाकर पहला विज्ञापन अभियान बनाएं।', AppLang.en: 'Tap the button below to create your first ad campaign.'},
     'view_in_ads_manager': {AppLang.hi: 'Ads Manager में देखें', AppLang.en: 'View in Ads Manager'},
     'demo_campaign_note': {AppLang.hi: 'डेमो मोड — कोई असली विज्ञापन खाता जुड़ा नहीं', AppLang.en: 'Demo mode — no real ad account connected'},
+    'campaign_live_note': {AppLang.hi: 'असली विज्ञापन खाते में बना — रुका हुआ, कोई खर्च नहीं', AppLang.en: 'Created in your real ad account — paused, no spend'},
+    'custom_campaign': {AppLang.hi: 'कस्टम अभियान', AppLang.en: 'Custom campaign'},
+    'promote_a_product': {AppLang.hi: 'उत्पाद का प्रचार करें', AppLang.en: 'Promote a product'},
+    'google_ads_soon': {AppLang.hi: 'Google Ads जल्द आ रहा है', AppLang.en: 'Google Ads coming soon'},
     'goal_traffic': {AppLang.hi: 'वेबसाइट पर ट्रैफ़िक', AppLang.en: 'Traffic to your page'},
     'goal_engagement': {AppLang.hi: 'सहभागिता (लाइक/शेयर)', AppLang.en: 'Engagement (likes/shares)'},
     'goal_sales': {AppLang.hi: 'बिक्री', AppLang.en: 'Sales'},
@@ -263,7 +267,10 @@ class T {
     'increase_by': {AppLang.hi: 'बढ़ाएं', AppLang.en: 'Increase by'},
     'boosting': {AppLang.hi: 'बजट बढ़ाया जा रहा है…', AppLang.en: 'Boosting budget…'},
     'budget_boosted': {AppLang.hi: 'बजट बढ़ा दिया गया', AppLang.en: 'Budget increased'},
-    'min_boost_amount': {AppLang.hi: 'कम से कम ₹250 बढ़ाएं', AppLang.en: 'Increase by at least ₹250'},
+    'min_boost_amount': {AppLang.hi: 'कम से कम ₹100 बढ़ाएं', AppLang.en: 'Increase by at least ₹100'},
+    'min_daily_budget': {AppLang.hi: 'दैनिक बजट कम से कम ₹97 होना चाहिए (प्लेटफ़ॉर्म की न्यूनतम सीमा)', AppLang.en: 'Daily budget must be at least ₹97 (the ad platform minimum)'},
+    'total_budget': {AppLang.hi: 'कुल बजट', AppLang.en: 'Total budget'},
+    'per_day_rate': {AppLang.hi: 'प्रतिदिन', AppLang.en: 'per day'},
   };
 
   static String of(BuildContext context, AppLang lang, String key) {

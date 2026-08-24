@@ -64,7 +64,13 @@ class _CreateCampaignScreenState extends ConsumerState<CreateCampaignScreen> {
       _snack(T.of(context, lang, 'select_at_least_one'));
       return;
     }
-    final budget = double.tryParse(_budgetCtrl.text.trim()) ?? 200.0;
+    final budget = double.tryParse(_budgetCtrl.text.trim()) ?? 0;
+    // Mirror the backend/platform floor so the artisan gets a clear message
+    // here instead of a rejection from Meta.
+    if (budget < kMinDailyBudget) {
+      _snack(T.of(context, lang, 'min_daily_budget'));
+      return;
+    }
     setState(() { _busy = true; });
     try {
       final c = await _api.createCampaign(
@@ -128,6 +134,9 @@ class _CreateCampaignScreenState extends ConsumerState<CreateCampaignScreen> {
                     Gap.l,
                     Text(t('choose_platforms'), style: Theme.of(context).textTheme.titleMedium),
                     Gap.s,
+                    // Meta is the only implemented platform. Google Ads is shown
+                    // as disabled rather than selectable — offering it would
+                    // create a campaign that silently never exists.
                     _PlatformTile(
                       icon: Icons.facebook_rounded,
                       title: 'Meta (Facebook + Instagram)',
@@ -139,9 +148,10 @@ class _CreateCampaignScreenState extends ConsumerState<CreateCampaignScreen> {
                     _PlatformTile(
                       icon: Icons.search_rounded,
                       title: 'Google Ads',
-                      selected: _platforms.contains('google'),
-                      onChanged: (v) => setState(() =>
-                          v ? _platforms.add('google') : _platforms.remove('google')),
+                      subtitle: t('google_ads_soon'),
+                      selected: false,
+                      enabled: false,
+                      onChanged: (_) {},
                     ),
                     Gap.l,
                     Text(t('campaign_goal'), style: Theme.of(context).textTheme.titleMedium),
@@ -245,29 +255,59 @@ class _CreateCampaignScreenState extends ConsumerState<CreateCampaignScreen> {
 }
 
 class _PlatformTile extends StatelessWidget {
-  const _PlatformTile({required this.icon, required this.title, required this.selected, required this.onChanged});
+  const _PlatformTile({
+    required this.icon,
+    required this.title,
+    required this.selected,
+    required this.onChanged,
+    this.subtitle,
+    this.enabled = true,
+  });
   final IconData icon;
   final String title;
+  final String? subtitle;
   final bool selected;
+  final bool enabled;
   final ValueChanged<bool> onChanged;
+
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => onChanged(!selected),
-      borderRadius: BorderRadius.circular(Radii.md),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary.withValues(alpha: 0.07) : AppColors.surface,
-          borderRadius: BorderRadius.circular(Radii.md),
-          border: Border.all(color: selected ? AppColors.primary : AppColors.line, width: selected ? 1.6 : 1.2),
+    final text = Theme.of(context).textTheme;
+    final tint = !enabled
+        ? AppColors.muted
+        : (selected ? AppColors.primary : AppColors.muted);
+    return Opacity(
+      opacity: enabled ? 1 : 0.55,
+      child: InkWell(
+        onTap: enabled ? () => onChanged(!selected) : null,
+        borderRadius: BorderRadius.circular(Radii.md),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primary.withValues(alpha: 0.07) : AppColors.surface,
+            borderRadius: BorderRadius.circular(Radii.md),
+            border: Border.all(
+                color: selected ? AppColors.primary : AppColors.line,
+                width: selected ? 1.6 : 1.2),
+          ),
+          child: Row(children: [
+            Icon(icon, color: tint),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(title, style: text.titleMedium),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 1),
+                  Text(subtitle!, style: text.labelSmall),
+                ],
+              ]),
+            ),
+            Checkbox(
+              value: selected,
+              onChanged: enabled ? (v) => onChanged(v ?? false) : null,
+            ),
+          ]),
         ),
-        child: Row(children: [
-          Icon(icon, color: selected ? AppColors.primary : AppColors.muted),
-          const SizedBox(width: 12),
-          Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium)),
-          Checkbox(value: selected, onChanged: (v) => onChanged(v ?? false)),
-        ]),
       ),
     );
   }

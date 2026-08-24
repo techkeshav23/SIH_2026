@@ -398,14 +398,20 @@ enum _AdImage { poster, studio, gallery }
 
 class _BoostScreenState extends ConsumerState<BoostScreen> {
   _AdImage _source = _AdImage.studio;
-  int _budget = 200;
+
+  /// Per-DAY budget, not a total. Meta charges per day and enforces a ~₹97/day
+  /// floor, so picking a small total and spreading it over a week would silently
+  /// be raised to the floor (e.g. "₹100 over 7 days" would really cost ~₹679).
+  /// Choosing the daily rate and showing the derived total keeps it honest.
+  int _dailyBudget = 100;
   int _days = 5;
   String _audience = 'nearby';
   String? _galleryPath;
   bool _busy = false;
 
-  int get _reachLow => (_budget * _days * 1.4).round();
-  int get _reachHigh => (_budget * _days * 3.2).round();
+  int get _total => _dailyBudget * _days;
+  int get _reachLow => (_total * 1.4).round();
+  int get _reachHigh => (_total * 3.2).round();
 
   Future<void> _pickGallery() async {
     final f = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 90);
@@ -416,8 +422,10 @@ class _BoostScreenState extends ConsumerState<BoostScreen> {
     setState(() => _busy = true);
     try {
       final result = await ref.read(apiProvider).boostProduct(
+            // The API takes the total; sending daily*days means the backend's
+            // total/days lands back on exactly the rate shown here.
             productId: widget.product.id,
-            budgetRupees: _budget.toDouble(),
+            budgetRupees: _total.toDouble(),
             days: _days,
             audience: _audience,
             imageSource: switch (_source) {
@@ -437,11 +445,17 @@ class _BoostScreenState extends ConsumerState<BoostScreen> {
       showDialog(
         context: context,
         builder: (_) => AlertDialog(
-          icon: const Icon(Icons.rocket_launch_rounded, color: AppColors.success, size: 40),
-          title: Text(hi ? 'Boost शुरू हो गया!' : 'Boost started!'),
-          content: Text(hi
-              ? 'आपका विज्ञापन समीक्षा के बाद Facebook व Instagram पर चलेगा।\n\nअनुमानित पहुँच: $reach लोग।'
-              : 'Your ad will run on Facebook & Instagram after review.\n\nEstimated reach: $reach people.'),
+          icon: const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 40),
+          title: Text(hi ? 'विज्ञापन बन गया' : 'Ad created'),
+          content: Text(
+            hi
+                ? 'आपका विज्ञापन Facebook/Instagram खाते में रुका हुआ (paused) बना है — '
+                    'जब आप चालू करेंगे तभी चलेगा और खर्च होगा।\n\n'
+                    'अनुमानित पहुँच: $reach लोग।'
+                : 'Your ad was created in your Facebook/Instagram account and is '
+                    'paused — it only runs and spends once you resume it.\n\n'
+                    'Estimated reach: $reach people.',
+          ),
           actions: [
             FilledButton(
               onPressed: () { Navigator.pop(context); Navigator.pop(context); },
@@ -494,11 +508,12 @@ class _BoostScreenState extends ConsumerState<BoostScreen> {
             (hi ? 'गैलरी' : 'Gallery', _source == _AdImage.gallery, _pickGallery),
           ]),
           Gap.l,
-          _label(hi ? 'बजट' : 'Budget'),
+          _label(hi ? 'रोज़ का बजट' : 'Daily budget'),
           Gap.s,
+          // Meta's floor is ~₹97/day, so ₹100 is the lowest honest option.
           _choiceRow([
-            for (final b in [100, 200, 500])
-              ('₹$b', _budget == b, () => setState(() => _budget = b)),
+            for (final b in [100, 250, 500])
+              ('₹$b', _dailyBudget == b, () => setState(() => _dailyBudget = b)),
           ]),
           Gap.l,
           _label(hi ? 'कितने दिन' : 'Duration'),
@@ -530,7 +545,12 @@ class _BoostScreenState extends ConsumerState<BoostScreen> {
               Gap.xs,
               Text('$_reachLow – $_reachHigh ${hi ? 'लोग' : 'people'}',
                   style: text.titleLarge?.copyWith(color: AppColors.success, fontWeight: FontWeight.w800)),
-              Text('₹$_budget · $_days ${hi ? 'दिन' : 'days'}', style: text.bodySmall),
+              // Show the derived total, so "₹100/day × 5 days = ₹500" is explicit
+              // rather than the artisan guessing what they committed to.
+              Text(
+                  '₹$_dailyBudget/${hi ? 'दिन' : 'day'} × $_days ${hi ? 'दिन' : 'days'}'
+                  ' = ₹$_total ${hi ? 'कुल' : 'total'}',
+                  style: text.bodySmall),
             ]),
           ),
           Gap.l,
@@ -540,11 +560,18 @@ class _BoostScreenState extends ConsumerState<BoostScreen> {
             icon: _busy
                 ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                 : const Icon(Icons.rocket_launch_rounded),
-            label: Text('${hi ? 'Boost करें' : 'Boost now'} · ₹$_budget'),
+            label: Text('${hi ? 'Boost करें' : 'Boost now'} · ₹$_total'),
           ),
           Gap.s,
-          Text(hi ? 'भुगतान सुरक्षित · कभी भी रोक सकते हैं' : 'Secure payment · pause anytime',
-              textAlign: TextAlign.center, style: text.labelSmall?.copyWith(color: AppColors.muted)),
+          // The ad is created PAUSED — nothing is charged until the artisan
+          // resumes it in Ads Manager. Saying "secure payment" would imply a
+          // charge that never happens.
+          Text(
+              hi
+                  ? 'विज्ञापन रुका हुआ बनेगा — आपकी मंज़ूरी तक कोई खर्च नहीं'
+                  : "Created paused — nothing is charged until you resume it",
+              textAlign: TextAlign.center,
+              style: text.labelSmall?.copyWith(color: AppColors.muted)),
         ],
       ),
     );

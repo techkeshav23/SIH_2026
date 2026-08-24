@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/format.dart';
 import '../../core/l10n.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
@@ -12,9 +13,9 @@ final campaignsProvider = FutureProvider.autoDispose<List<Campaign>>((ref) async
   return ref.read(apiProvider).listCampaigns();
 });
 
-/// List of ad campaigns the artisan has created (Meta / Google Ads), each
-/// created PAUSED — visible in the real ad account, never spending. Reached
-/// from the drawer; "Create" pushes CreateCampaignScreen.
+/// Every ad campaign the artisan has — whether it came from Marketing → Boost
+/// (promote one product) or from the custom-campaign form here. All are created
+/// PAUSED on Meta: visible in Ads Manager, never spending until resumed.
 class CampaignsScreen extends ConsumerWidget {
   const CampaignsScreen({super.key});
 
@@ -91,23 +92,45 @@ class _CampaignCard extends StatelessWidget {
             Expanded(
               child: Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: text.titleMedium),
             ),
-            KStatusPill(c.status == 'created' ? 'listed' : c.status),
+            // Same pill/vocabulary as everywhere else the status is shown.
+            KStatusPill(c.status),
           ]),
           Gap.s,
-          Wrap(spacing: 6, runSpacing: 6, children: [
-            for (final p in c.platforms)
-              Chip(
-                avatar: Icon(p == 'meta' ? Icons.facebook_rounded : Icons.search_rounded, size: 14),
-                label: Text(p == 'meta' ? 'Meta' : 'Google Ads'),
-                visualDensity: VisualDensity.compact,
+          Row(children: [
+            const Icon(Icons.facebook_rounded, size: 15, color: AppColors.muted),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                '${c.platformLabel} · ${rupees(c.dailyBudget)}/${hi ? 'दिन' : 'day'}',
+                maxLines: 1, overflow: TextOverflow.ellipsis, style: text.labelSmall,
               ),
+            ),
           ]),
           if (c.isStub) ...[
             Gap.s,
             Row(children: [
               const Icon(Icons.science_outlined, size: 13, color: AppColors.muted),
               const SizedBox(width: 5),
-              Text(t('demo_campaign_note'), style: text.labelSmall),
+              Expanded(child: Text(t('demo_campaign_note'), style: text.labelSmall)),
+            ]),
+          ] else ...[
+            Gap.s,
+            Row(children: [
+              const Icon(Icons.verified_rounded, size: 13, color: AppColors.success),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(t('campaign_live_note'),
+                    style: text.labelSmall?.copyWith(color: AppColors.success)),
+              ),
+            ]),
+          ],
+          // Surface why a creative/image was skipped instead of failing silently.
+          if ((c.error ?? '').isNotEmpty) ...[
+            Gap.s,
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Icon(Icons.info_outline_rounded, size: 13, color: AppColors.muted),
+              const SizedBox(width: 5),
+              Expanded(child: Text(c.error!, style: text.labelSmall, maxLines: 3)),
             ]),
           ],
         ],

@@ -17,6 +17,11 @@ const String kBaseUrl =
 /// re-prompt every user for fresh consent.
 const String kConsentVersion = '2026-08-dpdp-v1';
 
+/// Minimum per-day ad budget the ad platform will accept (₹). Mirrors
+/// backend meta_ads.MIN_DAILY_BUDGET_INR — keep the two in sync so the app
+/// validates before the platform rejects.
+const double kMinDailyBudget = 97.0;
+
 /// Defensively coerce an API body into a list of row-maps. Tolerates a wrapped
 /// `{items:[...]}` shape or an error object, and drops any non-map elements —
 /// so one malformed row never crashes a whole list.
