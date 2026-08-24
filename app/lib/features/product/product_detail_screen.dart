@@ -24,6 +24,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   final _titleHi = TextEditingController();
   final _titleEn = TextEditingController();
   final _descHi = TextEditingController();
+  final _descEn = TextEditingController();
   final _price = TextEditingController();
 
   Product? _p;
@@ -31,6 +32,16 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   bool _saving = false;
 
   Api get _api => ref.read(apiProvider);
+
+  @override
+  void dispose() {
+    _titleHi.dispose();
+    _titleEn.dispose();
+    _descHi.dispose();
+    _descEn.dispose();
+    _price.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -44,6 +55,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       _titleHi.text = p.titleHi ?? '';
       _titleEn.text = p.titleEn ?? '';
       _descHi.text = p.descHi ?? '';
+      _descEn.text = p.descEn ?? '';
       final pv = p.finalPrice ?? p.suggestedPriceMax;
       _price.text = pv == null ? '' : (pv % 1 == 0 ? pv.toInt().toString() : pv.toString());
       setState(() { _p = p; _loading = false; });
@@ -84,6 +96,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
         'title_hi': _titleHi.text,
         'title_en': _titleEn.text,
         'desc_hi': _descHi.text,
+        'desc_en': _descEn.text,
         'final_price': ?price,
         if (publish) 'status': 'listed',
       };
@@ -137,11 +150,13 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
         title: Text(T.of(context, lang, 'my_products')),
         actions: [
           KSpeak([
-            // Read the title in the selected language (fall back to the other).
+            // Read the title + description in the selected language (fall back).
             lang == AppLang.hi
                 ? (_titleHi.text.trim().isNotEmpty ? _titleHi.text : _titleEn.text)
                 : (_titleEn.text.trim().isNotEmpty ? _titleEn.text : _titleHi.text),
-            _descHi.text,
+            lang == AppLang.hi
+                ? (_descHi.text.trim().isNotEmpty ? _descHi.text : _descEn.text)
+                : (_descEn.text.trim().isNotEmpty ? _descEn.text : _descHi.text),
           ].where((s) => s.trim().isNotEmpty).join('. ')),
           if (p != null) KStatusPill(p.status),
           if (p != null)
@@ -168,9 +183,20 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                 Gap.m,
                 KSectionTitle(T.of(context, lang, 'listing')),
                 Gap.s,
-                _field(T.of(context, lang, 'title_hi'), _titleHi),
-                _field(T.of(context, lang, 'title_en'), _titleEn),
-                _field(T.of(context, lang, 'desc_hi'), _descHi, maxLines: 4),
+                // Show the selected language's title + description first, so an
+                // English-mode artisan sees the English listing (not Hindi), then
+                // the other language below (both stay editable).
+                if (lang == AppLang.hi) ...[
+                  _field(T.of(context, lang, 'title_hi'), _titleHi),
+                  _field(T.of(context, lang, 'desc_hi'), _descHi, maxLines: 4),
+                  _field(T.of(context, lang, 'title_en'), _titleEn),
+                  _field(T.of(context, lang, 'desc_en'), _descEn, maxLines: 4),
+                ] else ...[
+                  _field(T.of(context, lang, 'title_en'), _titleEn),
+                  _field(T.of(context, lang, 'desc_en'), _descEn, maxLines: 4),
+                  _field(T.of(context, lang, 'title_hi'), _titleHi),
+                  _field(T.of(context, lang, 'desc_hi'), _descHi, maxLines: 4),
+                ],
                 if (p.tags.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),

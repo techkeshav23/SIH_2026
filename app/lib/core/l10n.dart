@@ -86,6 +86,7 @@ class T {
     'title_hi': {AppLang.hi: 'शीर्षक (हिंदी)', AppLang.en: 'Title (Hindi)'},
     'title_en': {AppLang.hi: 'शीर्षक (English)', AppLang.en: 'Title (English)'},
     'desc_hi': {AppLang.hi: 'विवरण (हिंदी)', AppLang.en: 'Description (Hindi)'},
+    'desc_en': {AppLang.hi: 'विवरण (English)', AppLang.en: 'Description (English)'},
     'final_price': {AppLang.hi: 'अंतिम क़ीमत (₹)', AppLang.en: 'Final price (₹)'},
     'ai_suggested': {AppLang.hi: 'AI सुझाव', AppLang.en: 'AI suggested'},
     'saved': {AppLang.hi: 'सहेजा गया', AppLang.en: 'Saved'},
