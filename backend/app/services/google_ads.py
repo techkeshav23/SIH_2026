@@ -25,17 +25,30 @@ def enabled() -> bool:
     )
 
 
-def create_campaign(name: str, objective: str = "OUTCOME_TRAFFIC") -> dict:
+def create_campaign(
+    name: str,
+    objective: str = "OUTCOME_TRAFFIC",
+    daily_budget_inr: float = 200.0,
+    image_bytes: bytes | None = None,
+) -> dict:
     if not enabled():
         return _stub_campaign(name)
     try:
-        return _create_real(name, objective)
+        return _create_real(name, objective, daily_budget_inr, image_bytes)
     except Exception as e:  # noqa: BLE001
         log.warning("Google Ads campaign create failed for %r: %s", name, e)
         return _stub_campaign(name, error=str(e)[:200])
 
 
-def _create_real(name: str, objective: str) -> dict:
+def update_budget(campaign_id: str, daily_budget_inr: float) -> dict:
+    if not enabled() or campaign_id.startswith("stub_"):
+        return {"ok": False, "error": "google ads not enabled or stub campaign"}
+    return {"ok": False, "error": "not implemented"}
+
+
+def _create_real(
+    name: str, objective: str, daily_budget_inr: float, image_bytes: bytes | None
+) -> dict:
     # TODO(prod): use google-ads-python (CampaignBudgetService, CampaignService,
     # AdGroupService, AdGroupAdService), all mutate operations with the created
     # Campaign's status set to PAUSED. Requires an approved developer token for

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ---- Auth ----
@@ -322,6 +322,10 @@ class CampaignCreate(BaseModel):
     objective: str = "OUTCOME_TRAFFIC"     # OUTCOME_TRAFFIC | OUTCOME_ENGAGEMENT | OUTCOME_SALES
     daily_budget: float = 200.0            # INR — informational only, campaign is created PAUSED
     platforms: list[str] = ["meta"]        # "meta" | "google" | both
+
+
+class BudgetIncrease(BaseModel):
+    amount: float = Field(ge=250.0)  # ₹250 minimum bump, enforced server-side too
 
 
 class CampaignOut(BaseModel):

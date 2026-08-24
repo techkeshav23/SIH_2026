@@ -257,6 +257,13 @@ class T {
     'goal_traffic': {AppLang.hi: 'वेबसाइट पर ट्रैफ़िक', AppLang.en: 'Traffic to your page'},
     'goal_engagement': {AppLang.hi: 'सहभागिता (लाइक/शेयर)', AppLang.en: 'Engagement (likes/shares)'},
     'goal_sales': {AppLang.hi: 'बिक्री', AppLang.en: 'Sales'},
+    'boost_ad_budget': {AppLang.hi: 'विज्ञापन बजट बढ़ाएं', AppLang.en: 'Boost ad budget'},
+    'boost_ad_sub': {AppLang.hi: 'यह उत्पाद विज्ञापन अभियान में है — बजट बढ़ाकर ज़्यादा लोगों तक पहुंचें', AppLang.en: 'This product is being promoted — increase the budget to reach more buyers'},
+    'current_budget': {AppLang.hi: 'मौजूदा दैनिक बजट', AppLang.en: 'Current daily budget'},
+    'increase_by': {AppLang.hi: 'बढ़ाएं', AppLang.en: 'Increase by'},
+    'boosting': {AppLang.hi: 'बजट बढ़ाया जा रहा है…', AppLang.en: 'Boosting budget…'},
+    'budget_boosted': {AppLang.hi: 'बजट बढ़ा दिया गया', AppLang.en: 'Budget increased'},
+    'min_boost_amount': {AppLang.hi: 'कम से कम ₹250 बढ़ाएं', AppLang.en: 'Increase by at least ₹250'},
   };
 
   static String of(BuildContext context, AppLang lang, String key) {

@@ -320,13 +320,19 @@ class Demo {
   // ---- ad campaigns (Meta / Google Ads) ----
   static final List<Map<String, dynamic>> campaigns = [];
 
-  static Map<String, dynamic> newCampaign(String name, List<String> platforms) {
+  static Map<String, dynamic> boostCampaign(String campaignId, double amount) {
+    final c = campaigns.firstWhere((c) => c['id'] == campaignId, orElse: () => campaigns.first);
+    c['daily_budget'] = ((c['daily_budget'] as num?) ?? 200.0) + amount;
+    return c;
+  }
+
+  static Map<String, dynamic> newCampaign(String name, List<String> platforms, {String? productId}) {
     final ids = <String, dynamic>{};
     for (final pf in platforms) {
       ids[pf] = 'demo_${pf}_${_seq++}';
     }
     final c = {
-      'id': 'c${_seq++}', 'name': name, 'product_id': null,
+      'id': 'c${_seq++}', 'name': name, 'product_id': productId,
       'objective': 'OUTCOME_TRAFFIC', 'daily_budget': 200.0,
       'platforms': platforms, 'status': 'created',
       'platform_ids': ids, 'platform_urls': <String, dynamic>{}, 'error': null,

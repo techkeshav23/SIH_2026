@@ -30,6 +30,8 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   Product? _p;
   bool _loading = true;
   bool _saving = false;
+  List<Campaign> _campaigns = [];
+  bool _boosting = false;
 
   Api get _api => ref.read(apiProvider);
 
@@ -59,6 +61,11 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       final pv = p.finalPrice ?? p.suggestedPriceMax;
       _price.text = pv == null ? '' : (pv % 1 == 0 ? pv.toInt().toString() : pv.toString());
       setState(() { _p = p; _loading = false; });
+      // Best-effort — a campaigns-load failure shouldn't block viewing the product.
+      try {
+        final c = await _api.campaignsForProduct(widget.productId);
+        if (mounted) setState(() => _campaigns = c);
+      } catch (_) {/* no campaigns card shown */}
     } catch (_) {
       if (mounted) {
         setState(() => _loading = false);
@@ -138,6 +145,24 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   void _snack(String msg) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    }
+  }
+
+  Future<void> _boostBudget(Campaign c, double amount) async {
+    final lang = ref.read(langProvider);
+    final okMsg = T.of(context, lang, 'budget_boosted');
+    final failMsg = T.of(context, lang, 'try_again');
+    setState(() => _boosting = true);
+    try {
+      final updated = await _api.boostCampaignBudget(c.id, amount);
+      setState(() => _campaigns = [
+            for (final x in _campaigns) if (x.id == updated.id) updated else x,
+          ]);
+      _snack(okMsg);
+    } catch (_) {
+      _snack(failMsg);
+    } finally {
+      if (mounted) setState(() => _boosting = false);
     }
   }
 
@@ -233,6 +258,19 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                 _field(T.of(context, lang, 'final_price'), _price,
                     keyboard: const TextInputType.numberWithOptions(decimal: true),
                     formatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))]),
+                if (p.status == 'listed' && _campaigns.isNotEmpty) ...[
+                  Gap.l,
+                  KSectionTitle(T.of(context, lang, 'boost_ad_budget')),
+                  Gap.s,
+                  for (final c in _campaigns)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _BoostCard(
+                        c: c, lang: lang, busy: _boosting,
+                        onBoost: (amount) => _boostBudget(c, amount),
+                      ),
+                    ),
+                ],
                 Gap.l,
                 Row(
                   children: [
@@ -270,4 +308,69 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
           decoration: InputDecoration(labelText: label),
         ),
       );
+}
+
+/// "This product is being promoted — boost its ad budget" card, shown per
+/// active campaign on a listed product. Minimum bump is ₹250 (enforced here
+/// and again server-side in POST /campaigns/{id}/boost).
+class _BoostCard extends StatelessWidget {
+  const _BoostCard({required this.c, required this.lang, required this.busy, required this.onBoost});
+  final Campaign c;
+  final AppLang lang;
+  final bool busy;
+  final ValueChanged<double> onBoost;
+
+  static const _quickAmounts = [250.0, 500.0, 1000.0];
+
+  @override
+  Widget build(BuildContext context) {
+    final hi = lang == AppLang.hi;
+    final text = Theme.of(context).textTheme;
+    final platformLabel = c.platforms.map((p) => p == 'meta' ? 'Meta' : 'Google Ads').join(' + ');
+    return KCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            const Icon(Icons.trending_up_rounded, color: AppColors.primary, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: text.titleMedium),
+            ),
+          ]),
+          const SizedBox(height: 2),
+          Text(platformLabel, style: text.labelSmall),
+          Gap.s,
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Text(T.of(context, lang, 'current_budget'), style: text.bodyMedium),
+            Text(rupees(c.dailyBudget),
+                style: text.titleMedium?.copyWith(color: AppColors.primary, fontWeight: FontWeight.w800)),
+          ]),
+          Gap.m,
+          Text(T.of(context, lang, 'increase_by'), style: text.labelSmall),
+          Gap.xs,
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            for (final amount in _quickAmounts)
+              OutlinedButton(
+                onPressed: busy ? null : () => onBoost(amount),
+                child: Text('+${rupees(amount)}'),
+              ),
+          ]),
+          if (c.isStub) ...[
+            Gap.s,
+            Row(children: [
+              const Icon(Icons.science_outlined, size: 13, color: AppColors.muted),
+              const SizedBox(width: 5),
+              Text(T.of(context, lang, 'demo_campaign_note'), style: text.labelSmall),
+            ]),
+          ],
+          if (!c.isStub) ...[
+            Gap.xs,
+            Text(hi ? 'कम से कम ₹250 — असली विज्ञापन खाते में लागू होगा' : 'Min ₹250 — applied to your real ad account',
+                style: text.labelSmall),
+          ],
+        ],
+      ),
+    );
+  }
 }

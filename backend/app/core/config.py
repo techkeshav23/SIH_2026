@@ -95,6 +95,10 @@ class Settings(BaseSettings):
     meta_access_token: str = ""       # long-lived user/system-user token (ads_management)
     meta_ad_account_id: str = ""      # numeric id, without the "act_" prefix
     meta_api_version: str = "v21.0"
+    # A linked Facebook Page is required to attach a product image to the ad
+    # (AdCreative needs object_story_spec.page_id). Without it we still create
+    # the PAUSED campaign, just without the image/creative layer.
+    meta_page_id: str = ""
 
     # Google Ads API — same PAUSED-campaign-only approach. Off -> stub.
     use_google_ads: bool = False

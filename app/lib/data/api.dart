@@ -516,7 +516,9 @@ class Api {
     double dailyBudget = 200.0,
     List<String> platforms = const ['meta'],
   }) async {
-    if (demoMode) return Campaign.fromJson(Demo.newCampaign(name, platforms));
+    if (demoMode) {
+      return Campaign.fromJson(Demo.newCampaign(name, platforms, productId: productId));
+    }
     final r = await _dio.post('/campaigns', data: {
       'name': name,
       'product_id': productId,
@@ -531,6 +533,21 @@ class Api {
     if (demoMode) return Demo.campaigns.map((e) => Campaign.fromJson(e)).toList();
     final r = await _dio.get('/campaigns');
     return _rows(r.data).map(Campaign.fromJson).toList();
+  }
+
+  /// Which campaigns (if any) are promoting a given product — used to show the
+  /// "boost ad budget" card on the product detail screen only when relevant.
+  Future<List<Campaign>> campaignsForProduct(String productId) async {
+    final all = await listCampaigns();
+    return all.where((c) => c.productId == productId).toList();
+  }
+
+  /// Increase a campaign's daily budget by [amount] (min ₹250, also enforced
+  /// server-side). Updates the real platform campaign(s) best-effort.
+  Future<Campaign> boostCampaignBudget(String campaignId, double amount) async {
+    if (demoMode) return Campaign.fromJson(Demo.boostCampaign(campaignId, amount));
+    final r = await _dio.post('/campaigns/$campaignId/boost', data: {'amount': amount});
+    return Campaign.fromJson(r.data);
   }
 
   // ---- offline draft sync ----
