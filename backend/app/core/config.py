@@ -52,6 +52,11 @@ class Settings(BaseSettings):
     gemini_image_model: str = "gemini-2.5-flash-image"
     gemini_image_location: str = "global"   # image-gen isn't served from asia-south1
 
+    # Kala voice agent (Gemini Live, native audio). NOTE: the native-audio Live
+    # model is NOT served from asia-south1 — us-central1 is the nearest that has it.
+    voice_model: str = "gemini-live-2.5-flash-native-audio"
+    voice_location: str = "us-central1"
+
     pricing_model_path: str = "../ml/pricing_model.pkl"
 
     # ---- Payments ----

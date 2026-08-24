@@ -21,7 +21,7 @@ psycopg[binary]==3.2.3            # Postgres driver (prod)
 # ---- AI ----
 # google-genai serves Gemini models via Vertex AI (prod/govt) or the Developer
 # API. Vertex auth uses google-auth (bundled). Voice cataloging (F2) + pricing (F3).
-google-genai==1.9.0
+google-genai>=2.19.0
 
 # Durable product-image storage (Cloud Run disk is ephemeral).
 google-cloud-storage==2.18.2
