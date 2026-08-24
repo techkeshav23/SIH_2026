@@ -51,6 +51,7 @@ flutter:
   assets:
     - assets/icon/logo.png
     - assets/hero.jpg
+    - assets/kala.png
     - assets/demo/
   fonts:
     # Mukta (Ek Type) — one family for Latin + Devanagari so Hindi and English

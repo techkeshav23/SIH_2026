@@ -326,33 +326,40 @@ class _OrbState extends State<_Orb> with SingleTickerProviderStateMixin {
     return AnimatedBuilder(
       animation: _c,
       builder: (_, _) {
-        final t = widget.active ? _c.value : 0.0;
-        final size = 150.0 + (widget.speaking ? 26 : 12) * t;
-        return Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(
-              colors: [
-                Colors.white.withValues(alpha: 0.95),
-                AppColors.accent.withValues(alpha: 0.85),
-                AppColors.primary.withValues(alpha: 0.6),
-              ],
-              stops: const [0.0, 0.55, 1.0],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.accent.withValues(alpha: 0.4 + 0.3 * t),
-                blurRadius: 40 + 30 * t,
-                spreadRadius: 4 + 8 * t,
+        // static image, but a breathing scale + a glow that pulses (stronger while
+        // Kala speaks) makes her feel alive.
+        final t = widget.active ? _c.value : 0.3;
+        final glow = widget.speaking
+            ? (0.45 + 0.40 * t)
+            : (widget.active ? 0.22 + 0.15 * t : 0.14);
+        final scale = 1.0 + (widget.speaking ? 0.055 : (widget.active ? 0.022 : 0.0)) * t;
+        return Transform.scale(
+          scale: scale,
+          child: Container(
+            width: 190,
+            height: 190,
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const SweepGradient(
+                colors: [
+                  AppColors.accent,
+                  AppColors.primary,
+                  Color(0xFFD9772E),
+                  AppColors.accent,
+                ],
               ),
-            ],
-          ),
-          child: Icon(
-            widget.speaking ? Icons.graphic_eq_rounded : Icons.auto_awesome_rounded,
-            size: 48,
-            color: AppColors.primaryDark,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.accent.withValues(alpha: glow),
+                  blurRadius: 45 + 45 * t,
+                  spreadRadius: 4 + 12 * t,
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: Image.asset('assets/kala.png', width: 180, height: 180, fit: BoxFit.cover),
+            ),
           ),
         );
       },
