@@ -106,7 +106,9 @@ class HomeScreen extends ConsumerWidget {
                         refreshAll();
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                              content: Text(n > 0 ? '$n draft(s) synced' : 'Still offline')));
+                              content: Text(n > 0
+                                  ? (hi ? '$n ड्राफ़्ट सिंक हुए' : '$n draft(s) synced')
+                                  : (hi ? 'अभी ऑफ़लाइन है' : 'Still offline'))));
                         }
                       }),
                     ],
@@ -628,7 +630,7 @@ class _ProductCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(p.titleFor(hi) ?? 'Draft',
+                Text(p.titleFor(hi) ?? (hi ? 'ड्राफ़्ट' : 'Draft'),
                     maxLines: 1, overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 6),

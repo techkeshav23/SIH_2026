@@ -38,13 +38,13 @@ class MarketScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(Radii.pill),
                   border: Border.all(color: AppColors.success.withValues(alpha: 0.30)),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.verified_rounded, size: 14, color: AppColors.success),
-                    SizedBox(width: 5),
-                    Text('Govt · ONDC',
-                        style: TextStyle(
+                    const Icon(Icons.verified_rounded, size: 14, color: AppColors.success),
+                    const SizedBox(width: 5),
+                    Text(lang == AppLang.hi ? 'सरकारी · ONDC' : 'Govt · ONDC',
+                        style: const TextStyle(
                             color: AppColors.success, fontSize: 11.5, fontWeight: FontWeight.w700)),
                   ],
                 ),

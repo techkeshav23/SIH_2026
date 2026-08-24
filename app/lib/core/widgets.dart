@@ -257,23 +257,29 @@ class KLoading extends StatelessWidget {
       const Center(child: CircularProgressIndicator(color: AppColors.primary));
 }
 
-class KErrorState extends StatelessWidget {
+class KErrorState extends ConsumerWidget {
   const KErrorState({super.key, required this.message, this.onRetry});
   final String message;
   final VoidCallback? onRetry;
   @override
-  Widget build(BuildContext context) => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.cloud_off_rounded, size: 56, color: AppColors.muted),
-            const SizedBox(height: 12),
-            Text(message, style: Theme.of(context).textTheme.bodyMedium),
-            if (onRetry != null)
-              TextButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh), label: const Text('Retry')),
-          ],
-        ),
-      );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lang = ref.watch(langProvider);
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.cloud_off_rounded, size: 56, color: AppColors.muted),
+          const SizedBox(height: 12),
+          Text(message, style: Theme.of(context).textTheme.bodyMedium),
+          if (onRetry != null)
+            TextButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: Text(T.of(context, lang, 'retry'))),
+        ],
+      ),
+    );
+  }
 }
 
 /// Section title with optional trailing action.

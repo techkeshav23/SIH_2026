@@ -137,7 +137,10 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
         title: Text(T.of(context, lang, 'my_products')),
         actions: [
           KSpeak([
-            _titleHi.text.trim().isNotEmpty ? _titleHi.text : _titleEn.text,
+            // Read the title in the selected language (fall back to the other).
+            lang == AppLang.hi
+                ? (_titleHi.text.trim().isNotEmpty ? _titleHi.text : _titleEn.text)
+                : (_titleEn.text.trim().isNotEmpty ? _titleEn.text : _titleHi.text),
             _descHi.text,
           ].where((s) => s.trim().isNotEmpty).join('. ')),
           if (p != null) KStatusPill(p.status),
