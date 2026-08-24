@@ -167,8 +167,29 @@ class PosterScreen extends ConsumerStatefulWidget {
 class _PosterScreenState extends ConsumerState<PosterScreen> {
   final _posterKey = GlobalKey();
   bool _busy = false;
+  final Map<String, String> _aiCaptions = {}; // lang -> AI caption
+  final Set<String> _fetching = {};
 
-  String _caption(bool hi) {
+  /// AI (Gemini) caption if ready; otherwise kick off a fetch and show the
+  /// template meanwhile (so it's instant and always works offline).
+  String _captionFor(bool hi) {
+    final key = hi ? 'hi' : 'en';
+    final ai = _aiCaptions[key];
+    if (ai != null) return ai;
+    if (!_fetching.contains(key)) {
+      _fetching.add(key);
+      ref.read(apiProvider).marketingCaption(widget.product.id, lang: key).then((c) {
+        if (mounted && c != null && c.trim().isNotEmpty) {
+          setState(() => _aiCaptions[key] = c.trim());
+        }
+      });
+    }
+    return _template(hi);
+  }
+
+  bool _captionReady(bool hi) => _aiCaptions.containsKey(hi ? 'hi' : 'en');
+
+  String _template(bool hi) {
     final p = widget.product;
     final title = p.titleFor(hi) ?? 'Handmade product';
     final price = rupees(p.finalPrice ?? p.suggestedPriceMax ?? 0);
@@ -190,7 +211,7 @@ class _PosterScreenState extends ConsumerState<PosterScreen> {
       final dir = await getTemporaryDirectory();
       final file = File('${dir.path}/kalasetu_poster.png');
       await file.writeAsBytes(bytes);
-      await Share.shareXFiles([XFile(file.path)], text: _caption(hi));
+      await Share.shareXFiles([XFile(file.path)], text: _captionFor(hi));
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -202,7 +223,7 @@ class _PosterScreenState extends ConsumerState<PosterScreen> {
   }
 
   Future<void> _copyCaption(bool hi) async {
-    await Clipboard.setData(ClipboardData(text: _caption(hi)));
+    await Clipboard.setData(ClipboardData(text: _captionFor(hi)));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(hi ? 'कैप्शन कॉपी हो गया' : 'Caption copied')));
@@ -249,6 +270,16 @@ class _PosterScreenState extends ConsumerState<PosterScreen> {
             label: Text(hi ? 'कैप्शन कॉपी करें' : 'Copy caption'),
           ),
           Gap.m,
+          Row(children: [
+            const Icon(Icons.auto_awesome_rounded, size: 15, color: AppColors.accent),
+            const SizedBox(width: 6),
+            Text(hi ? 'AI कैप्शन' : 'AI caption',
+                style: Theme.of(context).textTheme.labelMedium),
+            const SizedBox(width: 8),
+            if (!_captionReady(hi))
+              const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
+          ]),
+          Gap.xs,
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -256,7 +287,7 @@ class _PosterScreenState extends ConsumerState<PosterScreen> {
               borderRadius: BorderRadius.circular(Radii.md),
               border: Border.all(color: AppColors.line),
             ),
-            child: Text(_caption(hi), style: Theme.of(context).textTheme.bodyMedium),
+            child: Text(_captionFor(hi), style: Theme.of(context).textTheme.bodyMedium),
           ),
         ],
       ),
@@ -433,43 +464,34 @@ class _BoostScreenState extends ConsumerState<BoostScreen> {
           Gap.m,
           _label(hi ? 'विज्ञापन की तस्वीर' : 'Ad image'),
           Gap.s,
-          Row(children: [
-            _choice(hi ? 'AI पोस्टर' : 'AI Poster', _source == _AdImage.poster,
+          _choiceRow([
+            (hi ? 'AI पोस्टर' : 'AI Poster', _source == _AdImage.poster,
                 () => setState(() => _source = _AdImage.poster)),
-            const SizedBox(width: 8),
-            _choice(hi ? 'Studio फ़ोटो' : 'Studio photo', _source == _AdImage.studio,
+            (hi ? 'Studio फ़ोटो' : 'Studio photo', _source == _AdImage.studio,
                 () => setState(() => _source = _AdImage.studio)),
-            const SizedBox(width: 8),
-            _choice(hi ? 'गैलरी' : 'Gallery', _source == _AdImage.gallery, _pickGallery),
+            (hi ? 'गैलरी' : 'Gallery', _source == _AdImage.gallery, _pickGallery),
           ]),
           Gap.l,
           _label(hi ? 'बजट' : 'Budget'),
           Gap.s,
-          Row(children: [
+          _choiceRow([
             for (final b in [100, 200, 500])
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: _choice('₹$b', _budget == b, () => setState(() => _budget = b)),
-              ),
+              ('₹$b', _budget == b, () => setState(() => _budget = b)),
           ]),
           Gap.l,
           _label(hi ? 'कितने दिन' : 'Duration'),
           Gap.s,
-          Row(children: [
+          _choiceRow([
             for (final d in [3, 5, 7])
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: _choice('$d ${hi ? 'दिन' : 'days'}', _days == d, () => setState(() => _days = d)),
-              ),
+              ('$d ${hi ? 'दिन' : 'days'}', _days == d, () => setState(() => _days = d)),
           ]),
           Gap.l,
           _label(hi ? 'किसे दिखे' : 'Audience'),
           Gap.s,
-          Row(children: [
-            _choice(hi ? 'आस-पास' : 'Nearby', _audience == 'nearby',
+          _choiceRow([
+            (hi ? 'आस-पास' : 'Nearby', _audience == 'nearby',
                 () => setState(() => _audience = 'nearby')),
-            const SizedBox(width: 8),
-            _choice(hi ? 'पूरे भारत' : 'All India', _audience == 'india',
+            (hi ? 'पूरे भारत' : 'All India', _audience == 'india',
                 () => setState(() => _audience = 'india')),
           ]),
           Gap.l,
@@ -508,24 +530,34 @@ class _BoostScreenState extends ConsumerState<BoostScreen> {
 
   Widget _label(String s) => Text(s, style: Theme.of(context).textTheme.titleSmall);
 
-  Widget _choice(String label, bool sel, VoidCallback onTap) => Expanded(
-        child: InkWell(
-          borderRadius: BorderRadius.circular(Radii.md),
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: sel ? AppColors.primary.withValues(alpha: 0.10) : AppColors.surface,
-              borderRadius: BorderRadius.circular(Radii.md),
-              border: Border.all(color: sel ? AppColors.primary : AppColors.line, width: sel ? 1.6 : 1.2),
-            ),
-            child: Text(label,
-                style: TextStyle(
-                    color: sel ? AppColors.primary : AppColors.text,
-                    fontWeight: sel ? FontWeight.w800 : FontWeight.w600,
-                    fontSize: 13.5)),
+  /// Row of equal-width choice chips (Expanded must be a direct Row child, so we
+  /// interleave SizedBox spacers here — never wrap an Expanded in a Padding).
+  Widget _choiceRow(List<(String, bool, VoidCallback)> opts) {
+    final children = <Widget>[];
+    for (var i = 0; i < opts.length; i++) {
+      if (i > 0) children.add(const SizedBox(width: 8));
+      children.add(Expanded(child: _choice(opts[i].$1, opts[i].$2, opts[i].$3)));
+    }
+    return Row(children: children);
+  }
+
+  Widget _choice(String label, bool sel, VoidCallback onTap) => InkWell(
+        borderRadius: BorderRadius.circular(Radii.md),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: sel ? AppColors.primary.withValues(alpha: 0.10) : AppColors.surface,
+            borderRadius: BorderRadius.circular(Radii.md),
+            border: Border.all(color: sel ? AppColors.primary : AppColors.line, width: sel ? 1.6 : 1.2),
           ),
+          child: Text(label,
+              textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  color: sel ? AppColors.primary : AppColors.text,
+                  fontWeight: sel ? FontWeight.w800 : FontWeight.w600,
+                  fontSize: 13.5)),
         ),
       );
 }

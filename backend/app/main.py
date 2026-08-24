@@ -17,6 +17,7 @@ from app.api import (
     orders,
     pricing,
     products,
+    promote,
     quotes,
     voice,
 )
@@ -139,6 +140,7 @@ app.include_router(dashboard.router)
 app.include_router(community.router)
 app.include_router(quotes.router)
 app.include_router(voice.router)
+app.include_router(promote.router)
 
 # Product images: durable GCS (private bucket, streamed back here) in prod, or
 # the local disk in dev/demo.

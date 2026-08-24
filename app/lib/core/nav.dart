@@ -15,7 +15,7 @@ const List<(String, IconData, String, String)> artisanTabs = [
   ('/home', Icons.home_rounded, 'Home', 'होम'),
   ('/products', Icons.inventory_2_rounded, 'Products', 'उत्पाद'),
   ('/orders', Icons.receipt_long_rounded, 'Orders', 'ऑर्डर'),
-  ('/quotes', Icons.gavel_rounded, 'Quotes', 'सौदे'),
+  ('/marketing', Icons.campaign_rounded, 'Marketing', 'मार्केटिंग'),
 ];
 
 /// Scaffold with a shared sidebar (drawer) + bottom navigation bar for the
@@ -118,6 +118,11 @@ class AppDrawer extends ConsumerWidget {
               icon: Icons.auto_awesome_rounded,
               label: hi ? 'कला — आवाज़ सहायक' : 'Kala — voice assistant',
               onTap: () { Navigator.pop(context); context.push('/kala'); },
+            ),
+            _DrawerItem(
+              icon: Icons.gavel_rounded,
+              label: hi ? 'थोक सौदे (Quotes)' : 'Bulk quotes',
+              onTap: () { Navigator.pop(context); context.push('/quotes'); },
             ),
             _DrawerItem(
               icon: Icons.dashboard_rounded,
