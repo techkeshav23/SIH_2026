@@ -148,34 +148,42 @@ async def voice_live(ws: WebSocket):
                                 )
                             elif data.get("type") == "end":
                                 break
-                except WebSocketDisconnect:
-                    pass
+                except (WebSocketDisconnect, RuntimeError):
+                    pass  # client closed the socket
 
             async def downlink():
-                """Gemini -> phone: stream audio, run tool calls, emit events."""
-                async for resp in session.receive():
-                    tc = getattr(resp, "tool_call", None)
-                    if tc and tc.function_calls:
-                        responses = []
-                        for fc in tc.function_calls:
-                            result = _run_tool(fc.name, user_id)
-                            responses.append(
+                """Gemini -> phone. session.receive() yields one TURN then ends, so
+                loop it: a tool call ends its turn silently and the spoken answer
+                arrives on the next pass — keep draining until the session closes."""
+                while True:
+                    had_audio = False
+                    alive = False
+                    async for resp in session.receive():
+                        alive = True
+                        tc = getattr(resp, "tool_call", None)
+                        if tc and tc.function_calls:
+                            responses = [
                                 types.FunctionResponse(
-                                    id=fc.id, name=fc.name, response=result
+                                    id=fc.id, name=fc.name,
+                                    response=_run_tool(fc.name, user_id),
                                 )
-                            )
-                        await session.send_tool_response(function_responses=responses)
-                        await ws.send_text(
-                            json.dumps({"type": "tool", "names": [f.name for f in tc.function_calls]})
-                        )
-                        continue
-                    if getattr(resp, "data", None):
-                        await ws.send_bytes(resp.data)
-                    sc = getattr(resp, "server_content", None)
-                    if sc and getattr(sc, "interrupted", False):
-                        await ws.send_text(json.dumps({"type": "interrupted"}))
-                    if sc and getattr(sc, "turn_complete", False):
+                                for fc in tc.function_calls
+                            ]
+                            await session.send_tool_response(function_responses=responses)
+                            await ws.send_text(json.dumps(
+                                {"type": "tool", "names": [f.name for f in tc.function_calls]}))
+                            continue
+                        if getattr(resp, "data", None):
+                            had_audio = True
+                            await ws.send_bytes(resp.data)
+                        sc = getattr(resp, "server_content", None)
+                        if sc and getattr(sc, "interrupted", False):
+                            await ws.send_text(json.dumps({"type": "interrupted"}))
+                    # one turn (receive pass) ended
+                    if had_audio:
                         await ws.send_text(json.dumps({"type": "turn_complete"}))
+                    if not alive:
+                        break  # session closed
 
             up = asyncio.create_task(uplink())
             down = asyncio.create_task(downlink())
