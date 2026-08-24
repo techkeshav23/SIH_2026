@@ -252,8 +252,17 @@ class Api {
       'product_id': productId,
       'file': await MultipartFile.fromFile(filePath),
     });
-    await _dio.post('/ai/enhance-image', data: form);
+    // Enhancement runs inline server-side (Cloud Run keeps CPU only during the
+    // request), so this call blocks until it's done — up to ~90s on a cold
+    // instance. Override the default 30s timeouts just for this AI upload.
+    await _dio.post('/ai/enhance-image', data: form, options: _aiUploadOpts);
   }
+
+  /// Generous per-request timeouts for the blocking AI upload calls.
+  static final _aiUploadOpts = Options(
+    sendTimeout: const Duration(seconds: 150),
+    receiveTimeout: const Duration(seconds: 150),
+  );
 
   /// Upload a recorded WAV clip; backend runs Vertex multimodal (speech->listing)
   /// as a durable job. Caller polls the product until it leaves `processing`.
@@ -268,7 +277,7 @@ class Api {
         contentType: DioMediaType('audio', 'wav'),
       ),
     });
-    await _dio.post('/ai/catalog-from-voice', data: form);
+    await _dio.post('/ai/catalog-from-voice', data: form, options: _aiUploadOpts);
   }
 
   Future<Product> catalogFromText(String productId, String text,
@@ -523,13 +532,19 @@ class Api {
   }
 
   /// Poll a product until it leaves the `processing` state (max ~30s).
-  Future<Product> pollUntilReady(String id) async {
-    for (var i = 0; i < 30; i++) {
-      final p = await getProduct(id);
-      if (!p.isProcessing) return p;
-      await Future.delayed(const Duration(seconds: 1));
+  /// Poll a product until its AI job leaves `processing`. Budgeted by wall-clock
+  /// (not a fixed count) so a cold rembg/Vertex load (~90s on a fresh instance)
+  /// still completes instead of the old 30s cap giving up early. A genuine
+  /// failure flips status to `draft`, so this returns promptly in that case too.
+  Future<Product> pollUntilReady(String id,
+      {Duration timeout = const Duration(seconds: 120)}) async {
+    final deadline = DateTime.now().add(timeout);
+    var p = await getProduct(id);
+    while (p.isProcessing && DateTime.now().isBefore(deadline)) {
+      await Future.delayed(const Duration(milliseconds: 1500));
+      p = await getProduct(id);
     }
-    return getProduct(id);
+    return p;
   }
 
   String mediaUrl(String path) =>

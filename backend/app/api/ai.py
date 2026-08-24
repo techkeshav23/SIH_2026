@@ -48,6 +48,10 @@ async def enhance_image(
     path = save_temp(raw, ".img")
     p.status = "processing"
     db.commit()
+    # Runs inline (eager). This MUST stay inside the request: Cloud Run only
+    # allocates CPU while a request is in flight, so a FastAPI BackgroundTask
+    # would be CPU-throttled and the rembg job would stall. The client gives this
+    # call a long receive timeout to cover a cold (~90s) enhance.
     enhance_image_task.delay(product_id, path)
     return JobAccepted(product_id=product_id, status="processing")
 
@@ -69,6 +73,7 @@ async def catalog_from_voice(
     path = save_temp(audio, ".audio")
     p.status = "processing"
     db.commit()
+    # Inline (see enhance_image) — kept in-request so Cloud Run keeps CPU allocated.
     catalog_voice_task.delay(product_id, path, mime, source_lang)
     return JobAccepted(product_id=product_id, status="processing")
 
